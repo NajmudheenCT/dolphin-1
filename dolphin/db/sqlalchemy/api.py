@@ -26,6 +26,7 @@ from oslo_db.sqlalchemy import session
 from oslo_log import log
 from oslo_utils import uuidutils
 from sqlalchemy import create_engine, update
+from webob import exc
 
 from dolphin import exception
 from dolphin.db.sqlalchemy import models
@@ -71,6 +72,10 @@ def register_db():
     for model in models:
         model.metadata.create_all(engine)
 
+def ensure_model_dict_has_field(model_dict,field):
+    if not model_dict.get(field):
+        return False
+    return True
 
 def registry_context_create(values):
     register_ref = models.RegistryContext()
@@ -121,6 +126,13 @@ def storage_get(storage_id):
         raise exception.StorageNotFound(storage_id=storage_id)
     return storage_by_id
 
+def registry_context_update(id, values):
+    this_session = get_session()
+    this_session.begin()
+    storage_ref = this_session.query(RegistryContext) \
+        .filter(RegistryContext.storage_id == id) \
+        .first().update(values)
+    return storage_ref
 
 def storage_get_all():
     this_session = get_session()

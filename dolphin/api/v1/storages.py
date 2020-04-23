@@ -61,10 +61,17 @@ class StorageController(wsgi.Controller):
         return dict(name="Storage 3")
 
     def update(self, req, id, body):
-        dict=body
-        dict['storage_id']=id
-        db.registry_context_update(dict)
-        return body
+        try:
+            # Todo :  Connect Driver and collect storage _ info
+            # IF dm.get_storage()
+            db.registry_context_update(id, body)
+            view = db.storage_get(id)
+        except exception.StorageNotFound:
+            msg = ("Storage %s not found.") % id
+            raise exc.HTTPNotFound(explanation=msg)
+        return dict(view)
+
+
 
     def delete(self, req, id):
         return webob.Response(status_int=http_client.ACCEPTED)
