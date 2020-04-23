@@ -26,6 +26,8 @@ from oslo_db.sqlalchemy import session
 from oslo_log import log
 from oslo_utils import uuidutils
 from sqlalchemy import create_engine, update
+
+from dolphin import exception
 from dolphin.db.sqlalchemy import models
 from dolphin.db.sqlalchemy.models import Storage, RegistryContext
 
@@ -115,6 +117,8 @@ def storage_get(storage_id):
     storage_by_id = this_session.query(Storage) \
         .filter(Storage.id == storage_id) \
         .first()
+    if storage_by_id is None:
+        raise exception.StorageNotFound(storage_id=storage_id)
     return storage_by_id
 
 

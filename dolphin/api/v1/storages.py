@@ -15,8 +15,9 @@ import copy
 
 from six.moves import http_client
 import webob
+from webob import exc
 
-from dolphin import db
+from dolphin import db, exception
 from dolphin.api.common import wsgi
 
 
@@ -49,13 +50,21 @@ class StorageController(wsgi.Controller):
         return build_storages(storage_all)
 
     def show(self, req, id):
-        return dict(name="Storage 2")
+        try:
+            view = db.storage_get(id)
+        except exception.StorageNotFound:
+            msg = ("Storage %s not found.") % id
+            raise exc.HTTPNotFound(explanation=msg)
+        return dict(view)
 
     def create(self, req, body):
         return dict(name="Storage 3")
 
     def update(self, req, id, body):
-        return dict(name="Storage 4")
+        dict=body
+        dict['storage_id']=id
+        db.registry_context_update(dict)
+        return body
 
     def delete(self, req, id):
         return webob.Response(status_int=http_client.ACCEPTED)
