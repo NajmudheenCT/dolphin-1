@@ -148,6 +148,8 @@ def storage_get(context, storage_id):
     storage_by_id = this_session.query(Storage) \
         .filter(Storage.id == storage_id) \
         .first()
+    if storage_by_id is None:
+        raise exception.StorageNotFound(storage_id=storage_id)
     return storage_by_id
 
 
