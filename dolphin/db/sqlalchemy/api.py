@@ -98,7 +98,14 @@ def access_info_create(context, values):
 
 def access_info_update(context, access_info_id, values):
     """Update a storage access information with the values dictionary."""
-    return NotImplemented
+    print(values)
+    this_session = get_session()
+    this_session.begin()
+    storage_ref = this_session.query(AccessInfo) \
+        .filter(AccessInfo.storage_id == access_info_id) \
+        .first().update(values)
+    this_session.commit()
+    return storage_ref
 
 
 def access_info_get(context, storage_id):

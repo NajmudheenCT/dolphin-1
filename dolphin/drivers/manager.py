@@ -37,7 +37,11 @@ class DriverManager(object):
 
     def register_storage(self, context, register_info):
         """Discovery a storage system with register parameters."""
-        pass
+        storage = {'name': 'Array1', 'id': '9876543212', 'vendor': 'EMC', 'model': 'VMAX',
+                   'description': 'EMC VMax Array', 'used_capacity': 123456.12, 'total_capacity': 12345678.32, 'free_capacity': 12222222.2,
+                   'status': 'available', 'serial_number': '9876543212'}
+
+        return storage
 
     def remove_storage(self, context, storage_id):
         """Clear driver instance from driver factory."""

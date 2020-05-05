@@ -20,8 +20,10 @@ from webob import exc
 from oslo_log import log
 
 from dolphin import db, context
+from dolphin.api import validation
 from dolphin.api.views import storages as storage_view
 from dolphin.api.common import wsgi
+from dolphin.api.schemas import storages as schema_storages
 from dolphin.drivers import manager as drivermanager
 from dolphin.db.sqlalchemy import api as db
 from dolphin import exception
@@ -48,6 +50,14 @@ def validate_parameters(data, required_parameters,
             msg = _("Required parameter %s is empty.") % parameter
             raise exc_response(explanation=msg)
 
+
+def update_access_info(access_info, body):
+    for attr, value in access_info.__dict__.items():
+        if attr in body:
+            if attr == 'extra_attributes':
+                access_info.extra_attributes.update(body['extra_attributes'])
+            access_info[attr] = body[attr]
+    del access_info.created_at, access_info.updated_at
 
 class StorageController(wsgi.Controller):
     def __init__(self):
@@ -160,8 +170,32 @@ class StorageController(wsgi.Controller):
 
         return device_info
 
+    @validation.schema(schema_storages.update)
     def update(self, req, id, body):
-        return dict(name="Storage 4")
+        try:
+
+            # Get Access info
+            ctx = req.environ.get('dolphin.context')
+            access_info = db.access_info_get(ctx, id)
+            update_access_info(access_info, body)
+            result = db.access_info_update(ctx,id,body)
+            # Merge New request parmaterts
+
+            # Connect Driver and get storage info
+
+            # update access_info
+
+            # update storage info
+            # Todo :  Connect Driver and collect storage _ info
+            # IF dm.get_storage()
+
+            #     db.registry_context_update(id, body)
+            #     view = db.storage_get(id)
+            return dict(result)
+        except exception.StorageNotFound:
+            msg = ("Storage %s not found.") % id
+            raise exc.HTTPNotFound(explanation=msg)
+            return dict(result)
 
     def delete(self, req, id):
         return webob.Response(status_int=http_client.ACCEPTED)
