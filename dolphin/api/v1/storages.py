@@ -53,6 +53,14 @@ def validate_parameters(data, required_parameters,
             raise exc_response(explanation=msg)
 
 
+def update_access_info(access_info, body):
+    for attr, value in access_info.__dict__.items():
+        if attr in body:
+            if attr == 'extra_attributes':
+                access_info.extra_attributes.update(body['extra_attributes'])
+            access_info[attr] = body[attr]
+    del access_info.created_at, access_info.updated_at
+
 class StorageController(wsgi.Controller):
     def __init__(self):
         super().__init__()
@@ -123,8 +131,22 @@ class StorageController(wsgi.Controller):
 
         return storage_view.build_storage(storage)
 
+    @validation.schema(schema_storages.update)
     def update(self, req, id, body):
-        return dict(name="Storage 4")
+        """Update storage access information."""
+
+        ctx = req.environ.get('dolphin.context')
+        try:
+            access_info = db.access_info_get(ctx, id)
+            update_access_info(access_info, body)
+            storage = self.driver_manager.register_storage(ctxt, access_info_dict)
+            result = db.access_info_update(ctx, id, body)
+
+            return dict(result)
+        except exception.AccessInfoNotFound:
+            msg = ("Storage %s not found.") % id
+            raise exc.HTTPNotFound(explanation=msg)
+            return dict(result)
 
     def delete(self, req, id):
         return webob.Response(status_int=http_client.ACCEPTED)
