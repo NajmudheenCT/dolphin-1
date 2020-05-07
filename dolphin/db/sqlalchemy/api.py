@@ -37,7 +37,6 @@ from dolphin.db.sqlalchemy.models import Storage, AccessInfo
 from dolphin import exception
 from dolphin.i18n import _
 
-
 CONF = cfg.CONF
 LOG = log.getLogger(__name__)
 _FACADE = None
@@ -127,7 +126,9 @@ def apply_like_filters(model):
                     regex_filters[key.rstrip('~')] = value
             query = process_exact_filters(query, exact_filters)
             return _process_model_like_filter(model, query, regex_filters)
+
         return _decorator
+
     return decorator_filters
 
 
@@ -173,7 +174,22 @@ def access_info_create(context, values):
 
 def access_info_update(context, access_info_id, values):
     """Update a storage access information with the values dictionary."""
-    return NotImplemented
+    """Update a storage access information with the values dictionary."""
+    print(values)
+    session = get_session()
+
+    try:
+        with session.begin():
+            result = session.query(AccessInfo) \
+                .filter(AccessInfo.storage_id == access_info_id) \
+                .first().update(values)
+            if values['username'] == "test":
+                raise exception.StorageNotFound("not found")
+    except Exception as e:
+        session.rollback()
+        log.exception(e)
+        raise e
+    return result
 
 
 def access_info_get(context, storage_id):

@@ -137,16 +137,24 @@ class StorageController(wsgi.Controller):
 
         ctx = req.environ.get('dolphin.context')
         try:
-            access_info = db.access_info_get(ctx, id)
-            update_access_info(access_info, body)
-            storage = self.driver_manager.register_storage(ctxt, access_info_dict)
-            result = db.access_info_update(ctx, id, body)
+            access_info_dict = db.access_info_get(ctx, id)
+            update_access_info(access_info_dict, body)
 
-            return dict(result)
-        except exception.AccessInfoNotFound:
-            msg = ("Storage %s not found.") % id
-            raise exc.HTTPNotFound(explanation=msg)
-            return dict(result)
+            storage = self.driver_manager.get_storage(ctx, access_info_dict['storage_id'])
+            body['password'] = cryptor.encode(access_info_dict['password'])
+            db.access_info_update(ctx, id, body)
+            db.storage_update(ctx,id,storage)
+            return storage_view.build_storage(storage)
+
+        except (exception.InvalidCredential,
+                    exception.StorageDriverNotFound,
+                    exception.AccessInfoNotFound,
+                    exception.StorageNotFound) as e:
+            raise exc.HTTPBadRequest(explanation=e.message)
+        except Exception as e:
+            msg = _('Failed to update storage access info: {0}'.format(e))
+            LOG.error(msg)
+            raise exc.HTTPBadRequest(explanation=msg)
 
     def delete(self, req, id):
         return webob.Response(status_int=http_client.ACCEPTED)
