@@ -36,3 +36,23 @@ create = {
     'required': ['host', 'port', 'username', 'password', 'vendor', 'model'],
     'additionalProperties': False
 }
+
+update = {
+    'type': 'object',
+    'properties': {
+        'host': parameter_types.hostname_or_ip_address,
+        'port': parameter_types.tcp_udp_port,
+        'username': {'type': 'string', 'minLength': 1, 'maxLength': 255},
+        'password': {'type': 'string'},
+        'extra_attributes': {
+            'type': 'object',
+            'patternProperties': {
+                '^[a-zA-Z0-9-_:. ]{1,255}$': {
+                    'type': 'string', 'maxLength': 255
+                }
+            }
+        }
+    },
+    'required': ['username', 'password'],
+    'additionalProperties': False
+}

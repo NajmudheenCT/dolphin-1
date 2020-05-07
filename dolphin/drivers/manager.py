@@ -69,7 +69,20 @@ class DriverManager(metaclass=utils.Singleton):
 
     def get_storage(self, context, storage_id):
         """Get storage device information from storage system"""
-        pass
+        # Todo : Change this when get_driver_insatnce() is ready
+        return {
+            'name': 'fake_driver',
+            'description': 'it is a fake driver.',
+            'vendor': 'fake_storage',
+            'model': 'fake_driver',
+            'status': 'normal',
+            'serial_number': '2102453JPN12KA000011',
+            'firmware_version': '1.0.0',
+            'location': 'HK',
+            'total_capacity': 1024 * 1024,
+            'used_capacity': 3126,
+            'free_capacity': 1045449,
+        }
 
     def list_pools(self, context, storage_id):
         """List all storage pools from storage system."""

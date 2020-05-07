@@ -173,7 +173,17 @@ def access_info_create(context, values):
 
 def access_info_update(context, access_info_id, values):
     """Update a storage access information with the values dictionary."""
-    return NotImplemented
+    session = get_session()
+    try:
+        with session.begin():
+            result = session.query(AccessInfo) \
+                .filter(AccessInfo.storage_id == access_info_id) \
+                .first().update(values)
+    except Exception as e:
+        session.rollback()
+        log.exception(e)
+        raise e
+    return result
 
 
 def access_info_get(context, storage_id):

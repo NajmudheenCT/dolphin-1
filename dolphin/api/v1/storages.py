@@ -53,6 +53,15 @@ def validate_parameters(data, required_parameters,
             raise exc_response(explanation=msg)
 
 
+def update_access_info(access_info, body):
+    for attr, value in access_info.__dict__.items():
+        if attr in body:
+            if attr == 'extra_attributes':
+                access_info.extra_attributes.update(body['extra_attributes'])
+            access_info[attr] = body[attr]
+    del access_info.created_at, access_info.updated_at
+
+
 class StorageController(wsgi.Controller):
     def __init__(self):
         super().__init__()
@@ -123,8 +132,31 @@ class StorageController(wsgi.Controller):
 
         return storage_view.build_storage(storage)
 
+    @validation.schema(schema_storages.update)
     def update(self, req, id, body):
-        return dict(name="Storage 4")
+        """Update storage access information."""
+        ctx = req.environ.get('dolphin.context')
+        try:
+            # Get existing access_info from DB
+            access_info_dict = db.access_info_get(ctx, id)
+            # Merge fields from request body to access_info
+            update_access_info(access_info_dict, body)
+            # Discover Storage with new access info
+            storage = self.driver_manager.get_storage(ctx, access_info_dict['storage_id'])
+            # Need to encode password before updating to DB
+            body['password'] = cryptor.encode(access_info_dict['password'])
+            db.access_info_update(ctx, id, body)
+            db.storage_update(ctx, id, storage)
+            return storage_view.build_storage(storage)
+        except (exception.InvalidCredential,
+                exception.StorageDriverNotFound,
+                exception.AccessInfoNotFound,
+                exception.StorageNotFound) as e:
+            raise exc.HTTPBadRequest(explanation=e.message)
+        except Exception as e:
+            msg = _('Failed to update storage access info: {0}'.format(e))
+            LOG.error(msg)
+            raise exc.HTTPBadRequest(explanation=msg)
 
     def delete(self, req, id):
         return webob.Response(status_int=http_client.ACCEPTED)
