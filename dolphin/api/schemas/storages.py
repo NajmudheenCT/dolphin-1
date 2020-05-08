@@ -43,7 +43,7 @@ update = {
         'host': parameter_types.hostname_or_ip_address,
         'port': parameter_types.tcp_udp_port,
         'username': {'type': 'string', 'minLength': 1, 'maxLength': 255},
-        'password': {'type': 'string'},
+        'password': {'type': 'string', 'minLength': 1, 'maxLength': 255},
         'extra_attributes': {
             'type': 'object',
             'patternProperties': {

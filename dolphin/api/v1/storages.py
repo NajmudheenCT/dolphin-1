@@ -54,12 +54,13 @@ def validate_parameters(data, required_parameters,
 
 
 def update_access_info(access_info, body):
-    for attr, value in access_info.__dict__.items():
-        if attr in body:
-            if attr == 'extra_attributes':
-                access_info.extra_attributes.update(body['extra_attributes'])
-            access_info[attr] = body[attr]
-    del access_info.created_at, access_info.updated_at
+    access_info_dict=access_info.to_dict()
+    for key in access_info_dict:
+        if key in body:
+            access_info_dict[key] = body[key]
+    del access_info_dict['created_at']
+    del access_info_dict['updated_at']
+    return access_info_dict
 
 
 class StorageController(wsgi.Controller):
@@ -142,15 +143,14 @@ class StorageController(wsgi.Controller):
         """Update storage access information."""
         ctx = req.environ.get('dolphin.context')
         try:
-            # Get existing access_info from DB
-            access_info_dict = db.access_info_get(ctx, id)
-            # Merge fields from request body to access_info
-            update_access_info(access_info_dict, body)
+            # Get existing access_info from DB and merge modified attributes
+            access_info = db.access_info_get(ctx, id)
+            access_info_dict = update_access_info(access_info, body)
             # Discover Storage with new access info
             storage = self.driver_manager.get_storage(ctx, access_info_dict['storage_id'])
             # Need to encode password before updating to DB
-            body['password'] = cryptor.encode(access_info_dict['password'])
-            db.access_info_update(ctx, id, body)
+            access_info_dict['password'] = cryptor.encode(access_info_dict['password'])
+            db.access_info_update(ctx, id, access_info_dict)
             db.storage_update(ctx, id, storage)
             return storage_view.build_storage(storage)
         except (exception.InvalidCredential,
