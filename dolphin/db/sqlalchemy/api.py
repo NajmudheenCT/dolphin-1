@@ -176,7 +176,8 @@ def access_info_update(context, access_info_id, values):
     session = get_session()
     with session.begin():
         result = session.query(AccessInfo) \
-            .filter(AccessInfo.storage_id == access_info_id)
+            .filter(AccessInfo.storage_id == access_info_id) \
+            .first().update(values)
     return result
 
 
