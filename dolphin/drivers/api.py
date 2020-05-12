@@ -31,11 +31,14 @@ class API(object):
         """Show register parameters which the driver needs."""
         pass
 
-    def register_storage(self, context, access_info):
+    def discover_storage(self, context, access_info):
         """Discovery a storage system with access information."""
-        print("from driver",access_info)
-        access_info['storage_id'] = six.text_type(uuidutils.generate_uuid())
-        driver = self.driver_manager.create_driver(context, **access_info)
+
+        if 'storage_id' not in access_info:
+            access_info['storage_id'] = six.text_type(uuidutils.generate_uuid())
+            driver = self.driver_manager.create_driver(context, **access_info)
+        else:
+            driver = self.driver_manager.get_driver(context, access_info['storage_id'])
 
         storage = driver.register_storage(context)
         if storage:
@@ -54,7 +57,7 @@ class API(object):
     def get_storage(self, context, storage_id):
         """Get storage device information from storage system"""
         print("get storage")
-        driver = self.driver_manager.get_driver(context,storage_id)
+        driver = self.driver_manager.get_driver(context, storage_id)
         return driver.get_storage(context)
 
     def list_pools(self, context, storage_id):

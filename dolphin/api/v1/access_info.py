@@ -54,12 +54,12 @@ class AccessInfoController(wsgi.Controller):
         ctx = req.environ.get('dolphin.context')
 
         # Get existing access_info from DB and merge modified attributes
-        access_info_now = db.access_info_get(ctx, id)
-        access_info_new_dict = update_access_info(access_info_now, body)
+        access_info_present = db.access_info_get(ctx, id)
+        access_info_updated_dict = update_access_info(access_info_present, body)
         # update access_info first
         try:
-            access_info_new_dict['password'] = cryptor.encode(access_info_new_dict['password'])
-            db.access_info_update(ctx, id, access_info_new_dict)
+            access_info_updated_dict['password'] = cryptor.encode(access_info_updated_dict['password'])
+            db.access_info_update(ctx, id, access_info_updated_dict)
         except Exception as e:
             msg = _('Failed to update storage access info: {0}'.format(e))
             LOG.error(msg)
@@ -67,8 +67,8 @@ class AccessInfoController(wsgi.Controller):
 
         try:
             # Discover Storage with new access info
-            storage = self.driver_api.get_storage(ctx, access_info_new_dict['storage_id'])
-            # Need to encode password before updating to DB
+            storage = self.driver_api.discover_storage(ctx, access_info_updated_dict)
+            # check whether new stora.serilnu == oldstorage==serilno
             if storage:
                 db.storage_update(ctx, id, storage)
                 return storage_view.build_storage(storage)
@@ -80,12 +80,14 @@ class AccessInfoController(wsgi.Controller):
                 exception.StorageNotFound) as e:
             # roll back access info
             LOG.error("Failed to get storage with new access_info, reverting access_info")
-            db.access_info_update(ctx, id, access_info_now)
+            # roll_back access_info
+            db.access_info_update(ctx, id, access_info_present)
             raise exc.HTTPBadRequest(explanation=e.message)
         except Exception as e:
             msg = _('Failed to update storage access info: {0}'.format(e))
             LOG.error(msg)
-            db.access_info_update(ctx, id, access_info_now)
+            # roll_back access_info
+            db.access_info_update(ctx, id, access_info_present)
             raise exc.HTTPBadRequest(explanation=msg)
 
 
