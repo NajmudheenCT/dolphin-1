@@ -63,3 +63,11 @@ class APIRouter(common.APIRouter):
         self.resources['volumes'] = volumes.create_resource()
         mapper.resource("volume", "volumes",
                         controller=self.resources['volumes'])
+        mapper.connect("storages", "/storages/{storage_id}/volumes",
+                       controller=self.resources['volumes'],
+                       action="list_volume",
+                       conditions={"method": ["GET"]})
+        mapper.connect("storages", "/storages/{storage_id}/volumes/{id}",
+                       controller=self.resources['volumes'],
+                       action="show_volume",
+                       conditions={"method": ["GET"]})

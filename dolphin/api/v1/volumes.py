@@ -11,17 +11,75 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from webob import exc
 
+from dolphin import exception, db
 from dolphin.api.common import wsgi
+from dolphin.api.views import volumes as volume_view
+from dolphin.api import common_utils as common
 
 
 class VolumeController(wsgi.Controller):
+    def _verify_storage(self, context, storage_id):
+        """verify the storage association  ."""
+        try:
+            db.storage_get(context, storage_id)
+        except exception.StorageNotFound:
+            msg = _("storage  '%s' not found.") % storage_id
+            raise exc.HTTPNotFound(explanation=msg)
+
+    def _get_volumes_search_options(self):
+        """Return pools search options allowed ."""
+        return ('name', 'status', 'id', 'storage_id', 'pool_id')
+
+    def _show(self, req, volume_id, storage_id=None):
+        ctxt = req.environ['dolphin.context']
+        if storage_id:
+            self._verify_storage(ctxt, storage_id)
+        try:
+            volume = db.volume_get(ctxt, volume_id)
+        except exception.VolumeNotFound as e:
+            raise exc.HTTPNotFound(explanation=e.message)
+        return volume_view.build_volume(volume)
+
+    def _index(self, req, storage_id=None):
+        ctxt = req.environ['dolphin.context']
+        query_params = {}
+        query_params.update(req.GET)
+        # update options  other than filters
+        sort_keys = (lambda x: [x] if x is not None else x)(query_params.get('sort_key'))
+        sort_dirs = (lambda x: [x] if x is not None else x)(query_params.get('sort_dir'))
+        limit = query_params.get('limit', None)
+        offset = query_params.get('offset', None)
+        marker = query_params.get('marker', None)
+        # strip out options except supported search  options
+        common.remove_invalid_options(ctxt, query_params,
+                                      self._get_volumes_search_options())
+        if storage_id:
+            query_params['storage_id'] = storage_id
+        try:
+            volumes = db.volume_get_all(ctxt, marker, limit, sort_keys, sort_dirs,
+                                    query_params, offset)
+        except  exception.InvalidInput as e:
+            raise exc.HTTPBadRequest(explanation=six.text_type(e))
+        except Exception as e:
+            msg = "Error in list volume query "
+            raise exc.HTTPNotFound(explanation=msg)
+        return volume_view.build_volumes(volumes)
+
+    def list_volume(self, req, storage_id):
+        """Return a list of volumes for storage."""
+        return self._index(req, storage_id)
+
+    def show_volume(self, req, id, storage_id):
+        """Return a detail of a volume associated with storage."""
+        return self._show(req, id, storage_id)
 
     def index(self, req):
-        return dict(name="Storage volume 1")
+        return self._index(req)
 
     def show(self, req, id):
-        return dict(name="Storage volume 2")
+        return self._show(req, id)
 
 
 def create_resource():

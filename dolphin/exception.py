@@ -151,6 +151,8 @@ class InvalidCredential(Invalid):
     message = _("The credentials are invalid.")
 
 
+
+
 class InvalidRequest(Invalid):
     message = _("The request is invalid.")
 
@@ -253,6 +255,9 @@ class StorageNotFound(NotFound):
 
 class PoolNotFound(NotFound):
     message = _("Pool %(id)s could not be found.")
+
+class VolumeNotFound(NotFound):
+    message = _("Volume %(id)s could not be found.")
 
 
 class StorageDriverNotFound(NotFound):
