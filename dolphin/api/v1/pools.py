@@ -42,7 +42,7 @@ class PoolController(wsgi.Controller):
             self._verify_storage(ctxt, storage_id)
         try:
             pool = db.pool_get(ctxt, pool_id)
-        except exception.StorageNotFound as e:
+        except exception.PoolNotFound as e:
             raise exc.HTTPNotFound(explanation=e.message)
         return pool_view.build_pool(pool)
 
