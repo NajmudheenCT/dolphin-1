@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
+
 
 import six
 from webob import exc
@@ -25,6 +25,7 @@ from dolphin.i18n import _
 
 class PoolController(wsgi.Controller):
     def _verify_storage(self, context, storage_id):
+        """verify the storage association  ."""
         try:
             db.storage_get(context, storage_id)
         except exception.StorageNotFound:
@@ -38,7 +39,7 @@ class PoolController(wsgi.Controller):
     def _show(self, req, pool_id, storage_id=None):
         ctxt = req.environ['dolphin.context']
         if storage_id:
-            self._verify_storage(ctxt,storage_id)
+            self._verify_storage(ctxt, storage_id)
         try:
             pool = db.pool_get(ctxt, pool_id)
         except exception.StorageNotFound as e:
@@ -66,7 +67,7 @@ class PoolController(wsgi.Controller):
         except  exception.InvalidInput as e:
             raise exc.HTTPBadRequest(explanation=six.text_type(e))
         except Exception as e:
-            msg = "Error in list pool Query "
+            msg = "Error in list pool query "
             raise exc.HTTPNotFound(explanation=msg)
         return pool_view.build_pools(pools)
 
@@ -75,15 +76,14 @@ class PoolController(wsgi.Controller):
         return self._index(req, storage_id)
 
     def show_pool(self, req, id, storage_id):
-        return self._show(req, id,storage_id)
+        """Return a detail of a pool associated with storage."""
+        return self._show(req, id, storage_id)
 
     def index(self, req):
         return self._index(req)
 
     def show(self, req, id):
         return self._show(req, id)
-
-
 
 
 def create_resource():
