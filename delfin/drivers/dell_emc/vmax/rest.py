@@ -25,6 +25,7 @@ import requests.exceptions as r_exc
 import six
 
 from delfin import exception
+from delfin.drivers.dell_emc.vmax import common
 from delfin.i18n import _
 
 LOG = logging.getLogger(__name__)
@@ -182,10 +183,10 @@ class VMaxRest(object):
         if status_code not in [STATUS_200, STATUS_201,
                                STATUS_202, STATUS_204]:
             exception_message = (
-                _("Error %(operation)s. The status code received is %(sc)s "
-                  "and the message is %(message)s.") % {
-                    'operation': operation, 'sc': status_code,
-                    'message': message})
+                    _("Error %(operation)s. The status code received is %(sc)s "
+                      "and the message is %(message)s.") % {
+                        'operation': operation, 'sc': status_code,
+                        'message': message})
             raise exception.StorageBackendException(
                 message=exception_message)
 
@@ -517,6 +518,35 @@ class VMaxRest(object):
         except (KeyError, TypeError):
             pass
         return device_ids
+
+    def post_request(self, target_uri, payload):
+        """Generate  a POST request.
+
+        :param target_uri: the category
+        :param payload: the payload
+        :returns: status_code -- int, message -- string, server response
+        """
+
+        status_code, message = self.request(target_uri, POST,
+                                            request_object=payload)
+        operation = 'Performance query for URL' % {'res': target_uri}
+        self.check_status_code_success(
+            operation, status_code, message)
+        return status_code, message
+
+    def get_array_performance_data(self, array, interval):
+
+        print("Iam in rest client")
+
+        target_uri = '/performance/Array/metrics'
+
+        payload = common.generate_performance_payload(array, interval, common.ARRAY_METRICS)
+
+        status_code, message = self.post_request(target_uri, target_uri, payload)
+        if status_code != STATUS_200:
+            raise exception.StoragePerformanceCollectionFailed(message)
+        print(status_code)
+        return message
 
     def list_pagination(self, list_info):
         """Process lists under or over the maxPageSize

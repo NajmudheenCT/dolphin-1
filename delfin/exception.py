@@ -256,3 +256,6 @@ class StorageListAlertFailed(DelfinException):
 
 class HTTPConnectionTimeout(DelfinException):
     msg_fmt = _("HTTP connection timeout: {0}.")
+
+class StoragePerformanceCollectionFailed(DelfinException):
+    msg_fmt = _("Failed to collect performance metrics. Reason: {0}.")

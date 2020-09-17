@@ -17,7 +17,7 @@ from oslo_utils import units
 
 from delfin import exception
 from delfin.common import constants
-from delfin.drivers.dell_emc.vmax import rest
+from delfin.drivers.dell_emc.vmax import rest, common
 
 LOG = log.getLogger(__name__)
 
@@ -220,3 +220,31 @@ class VMAXClient(object):
         """Clear alert for given sequence number."""
         return self.rest.clear_alert(sequence_number, version=self.uni_version,
                                      array=self.array_id)
+
+    def get_array_performance_data(self, storage_id, interval):
+
+        try:
+            # Fetch VMAX Array Performance data from REST client
+            print("Iam here")
+            perf_data = self.rest.get_array_performance_data(
+                self.array_id, interval)
+            print(perf_data)
+            # parse VMAX REST Response
+            metric_list = common.parse_performance_data(perf_data)
+            # prepare  labels required for array_leval performance data
+            labels = {}
+            labels['storage_id'] = storage_id
+            labels['resource_type'] = 'array'
+            # map to unified delifn array metrics
+            delfin_metrics= common.fill_array_performance_metrics(metric_list)
+            metrics_array = []
+            for key in common.DELFIN_ARRAY_METRICS:
+                m= common.MetricStruct(name=key, labels=labels, values=delfin_metrics[key])
+
+                metrics_array.append(m)
+            return metrics_array
+
+        except Exception as err:
+            msg = "Failed to get performance metrics data from VMAX: {}".format(err)
+            LOG.error(msg)
+            raise exception.StorageBackendException(msg)

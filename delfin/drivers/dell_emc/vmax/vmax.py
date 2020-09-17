@@ -17,7 +17,7 @@ from oslo_utils import units
 from delfin.common import constants
 from delfin.drivers.dell_emc.vmax.alert_handler import snmp_alerts
 from delfin.drivers.dell_emc.vmax.alert_handler import unisphere_alerts
-from delfin.drivers.dell_emc.vmax import client
+from delfin.drivers.dell_emc.vmax import client, common
 from delfin.drivers import driver
 
 LOG = log.getLogger(__name__)
@@ -70,7 +70,9 @@ class VMAXStorageDriver(driver.StorageDriver):
         return storage
 
     def list_storage_pools(self, context):
-        return self.client.list_storage_pools(self.storage_id)
+        print("syncing storage pool")
+        # return self.client.list_storage_pools(self.storage_id)
+        return self.client.get_performance_data(self.storage_id, interval=900)
 
     def list_volumes(self, context):
         return self.client.list_volumes(self.storage_id)
@@ -89,6 +91,11 @@ class VMAXStorageDriver(driver.StorageDriver):
 
     def list_alerts(self, context):
         alert_list = self.client.list_alerts()
-        alert_model_list = unisphere_alerts.AlertHandler()\
+        alert_model_list = unisphere_alerts.AlertHandler() \
             .parse_queried_alerts(alert_list)
         return alert_model_list
+
+    def collect_array_metrics(self, context, storage_id, interval, is_historic):
+        if not is_historic:
+            interval= common.VMAX_MIN_PERF_INTERVAL
+        return self.client.get_array_performance_data(self.storage_id, interval=interval)
