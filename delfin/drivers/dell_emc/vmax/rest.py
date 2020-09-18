@@ -542,7 +542,7 @@ class VMaxRest(object):
 
         payload = common.generate_performance_payload(array, interval, common.ARRAY_METRICS)
 
-        status_code, message = self.post_request(target_uri, target_uri, payload)
+        status_code, message = self.post_request(target_uri,  payload)
         if status_code != STATUS_200:
             raise exception.StoragePerformanceCollectionFailed(message)
         print(status_code)
