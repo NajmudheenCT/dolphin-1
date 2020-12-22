@@ -55,7 +55,7 @@ MIN_VOLUME, MAX_VOLUME = 1, 2000
 MIN_CONTROLLERS, MAX_CONTROLLERS = 1, 5
 PAGE_LIMIT = 500
 MIN_STORAGE, MAX_STORAGE = 1, 10
-MIN_PERF_VALUES, MAX_PERF_VALUES = 1, 4
+MIN_PERF_VALUES, MAX_PERF_VALUES = 1, 100
 
 
 def get_range_val(range_str, t):
@@ -305,10 +305,21 @@ class FakeStorageDriver(driver.StorageDriver):
     def _get_random_performance(self):
         def get_random_timestamp_value():
             rtv = {}
-            for i in range(MIN_PERF_VALUES, MAX_PERF_VALUES):
-                timestamp = int(float(datetime.datetime.now().timestamp()
-                                      ) * 1000)
-                rtv[timestamp] = random.uniform(1, 100)
+
+            high_val = [11, 12,13,14,15,16,17,18,19,20, 31,32,33,34,35,36,37,38,39,40,51,52,53,54,55,56,57,58,59,60,71,72,73,74,75,74,77,78,79,80,91,92,93,94,95,96,97,98,99]
+            SPIKE = [51, 52, 53, 54, 55, 56, 56]
+            for i in range(100):
+                # timestamp = int(float(datetime.datetime.now().timestamp()
+                #                       ) * 1000) + (100*i)
+                timestamp = 1608556823 + (i*5)
+
+                rtv[timestamp] = random.uniform(10, 30)
+                # print(i, rtv[timestamp] )
+                if i in high_val:
+                    rtv[timestamp] = random.uniform(70, 80)
+                if i in SPIKE:
+                    rtv[timestamp] = random.uniform(120, 130)
+
             return rtv
 
         # The sample performance_params after filling looks like,
@@ -332,5 +343,6 @@ class FakeStorageDriver(driver.StorageDriver):
                 m = constants.metric_struct(name=key, labels=labels,
                                             values=fake_metrics[key])
                 array_metrics.append(m)
+                #print(m)
 
         return array_metrics

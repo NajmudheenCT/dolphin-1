@@ -75,6 +75,7 @@ class TaskManager(manager.Manager):
                             SCHEDULING_MIN_INTERVAL):
                         is_historic = resource_type.get('is_historic')
                         interval = resource_type.get('interval')
+                        interval = 20
 
                         # add the task to scheduler(basically, it calls the
                         # perf_collect method from PerformanceController class
