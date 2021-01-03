@@ -28,8 +28,10 @@ class OceanStorDriver(driver.StorageDriver):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.client = rest_client.RestClient(**kwargs)
-        self.client.login()
         self.sector_size = consts.SECTORS_SIZE
+
+    def reset_connection(self, context, **kwargs):
+        self.client.reset_connection(**kwargs)
 
     def get_storage(self, context):
 
@@ -112,7 +114,13 @@ class OceanStorDriver(driver.StorageDriver):
             LOG.error(
                 "Failed to get pool metrics from OceanStor: {}".format(err))
             raise exception.StorageBackendException(
-                reason='Failed to get pool metrics from OceanStor')
+                'Failed to get pool metrics from OceanStor')
+
+    def _get_orig_pool_id(self, pools, volume):
+        for pool in pools:
+            if volume['PARENTNAME'] == pool['NAME']:
+                return pool['ID']
+        return ''
 
     def list_volumes(self, context):
         try:
@@ -123,11 +131,7 @@ class OceanStorDriver(driver.StorageDriver):
             volume_list = []
             for volume in volumes:
                 # Get pool id of volume
-                orig_pool_id = ''
-                for pool in pools:
-                    if volume['PARENTNAME'] == pool['NAME']:
-                        orig_pool_id = pool['ID']
-
+                orig_pool_id = self._get_orig_pool_id(pools, volume)
                 compressed = False
                 if volume['ENABLECOMPRESSION'] != 'false':
                     compressed = True
@@ -172,7 +176,7 @@ class OceanStorDriver(driver.StorageDriver):
             LOG.error(
                 "Failed to get list volumes from OceanStor: {}".format(err))
             raise exception.StorageBackendException(
-                reason='Failed to get list volumes from OceanStor')
+                'Failed to get list volumes from OceanStor')
 
     def add_trap_config(self, context, trap_config):
         pass
@@ -180,8 +184,16 @@ class OceanStorDriver(driver.StorageDriver):
     def remove_trap_config(self, context, trap_config):
         pass
 
-    def parse_alert(self, context, alert):
+    @staticmethod
+    def parse_alert(context, alert):
         return alert_handler.AlertHandler().parse_alert(context, alert)
 
-    def clear_alert(self, context, alert):
-        pass
+    def clear_alert(self, context, sequence_number):
+        return self.client.clear_alert(sequence_number)
+
+    def list_alerts(self, context, query_para):
+        # First query alerts and then translate to model
+        alert_list = self.client.list_alerts()
+        alert_model_list = alert_handler.AlertHandler()\
+            .parse_queried_alerts(alert_list, query_para)
+        return alert_model_list

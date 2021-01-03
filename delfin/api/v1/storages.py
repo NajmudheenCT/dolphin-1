@@ -30,7 +30,7 @@ from delfin.common import constants
 from delfin.drivers import api as driverapi
 from delfin.i18n import _
 from delfin.task_manager import rpcapi as task_rpcapi
-from delfin.task_manager.tasks import task
+from delfin.task_manager.tasks import resources
 
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
@@ -78,21 +78,24 @@ class StorageController(wsgi.Controller):
         # Lock to avoid synchronous creating.
         for access in constants.ACCESS_TYPE:
             if access_info_dict.get(access) is not None:
-                host = access_info_dict.get('rest').get('host')
-                port = access_info_dict.get('rest').get('port')
+                host = access_info_dict.get(access).get('host')
                 break
-        lock_name = 'storage-create-' + host + '-' + str(port)
-        coordination.synchronized(lock_name)
+        lock_name = 'storage-create-' + host
+        lock = coordination.Lock(lock_name)
 
-        if self._storage_exist(ctxt, access_info_dict):
-            raise exception.StorageAlreadyExists()
-
-        storage = self.driver_api.discover_storage(ctxt,
-                                                   access_info_dict)
+        with lock:
+            if self._storage_exist(ctxt, access_info_dict):
+                raise exception.StorageAlreadyExists()
+            storage = self.driver_api.discover_storage(ctxt,
+                                                       access_info_dict)
 
         # Registration success, sync resource collection for this storage
         try:
             self.sync(req, storage['id'])
+
+            # Post registration, trigger alert sync
+            self.task_rpcapi.sync_storage_alerts(ctxt, storage['id'],
+                                                 query_para=None)
         except Exception as e:
             # Unexpected error occurred, while syncing resources.
             msg = _('Failed to sync resources for storage: %(storage)s. '
@@ -105,7 +108,7 @@ class StorageController(wsgi.Controller):
         ctxt = req.environ['delfin.context']
         storage = db.storage_get(ctxt, id)
 
-        for subclass in task.StorageResourceTask.__subclasses__():
+        for subclass in resources.StorageResourceTask.__subclasses__():
             self.task_rpcapi.remove_storage_resource(
                 ctxt,
                 storage['id'],
@@ -125,7 +128,7 @@ class StorageController(wsgi.Controller):
         storages = db.storage_get_all(ctxt)
         LOG.debug("Total {0} registered storages found in database".
                   format(len(storages)))
-        resource_count = len(task.StorageResourceTask.__subclasses__())
+        resource_count = len(resources.StorageResourceTask.__subclasses__())
 
         for storage in storages:
             try:
@@ -135,7 +138,8 @@ class StorageController(wsgi.Controller):
                          % (storage['id'], e.msg))
                 continue
             else:
-                for subclass in task.StorageResourceTask.__subclasses__():
+                for subclass in \
+                        resources.StorageResourceTask.__subclasses__():
                     self.task_rpcapi.sync_storage_resource(
                         ctxt,
                         storage['id'],
@@ -150,9 +154,9 @@ class StorageController(wsgi.Controller):
         """
         ctxt = req.environ['delfin.context']
         storage = db.storage_get(ctxt, id)
-        resource_count = len(task.StorageResourceTask.__subclasses__())
+        resource_count = len(resources.StorageResourceTask.__subclasses__())
         _set_synced_if_ok(ctxt, storage['id'], resource_count)
-        for subclass in task.StorageResourceTask.__subclasses__():
+        for subclass in resources.StorageResourceTask.__subclasses__():
             self.task_rpcapi.sync_storage_resource(
                 ctxt,
                 storage['id'],
@@ -207,11 +211,11 @@ def _set_synced_if_ok(context, storage_id, resource_count):
         interval = (current_time - last_update).seconds
         # If last synchronization was within
         # CONF.sync_task_expiration(in seconds), and the sync status
-        # is not SYNCED, it means some sync task is still running,
+        # is bigger than 0, it means some sync task is still running,
         # the new sync task should not launch
         if interval < CONF.sync_task_expiration and \
-                storage['sync_status'] != constants.SyncStatus.SYNCED:
-            msg = 'Sync task is running for %s' % storage['id']
-            raise exception.InvalidInput(message=msg)
-        storage['sync_status'] = resource_count
+                storage['sync_status'] > 0:
+            raise exception.StorageIsSyncing(storage['id'])
+        storage['sync_status'] = resource_count * constants.ResourceSync.START
+        storage['updated_at'] = current_time
         db.storage_update(context, storage['id'], storage)

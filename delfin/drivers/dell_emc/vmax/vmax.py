@@ -15,7 +15,8 @@
 from oslo_log import log
 from oslo_utils import units
 from delfin.common import constants
-from delfin.drivers.dell_emc.vmax import alert_handler
+from delfin.drivers.dell_emc.vmax.alert_handler import snmp_alerts
+from delfin.drivers.dell_emc.vmax.alert_handler import unisphere_alerts
 from delfin.drivers.dell_emc.vmax import client
 from delfin.drivers import driver
 
@@ -29,14 +30,17 @@ class VMAXStorageDriver(driver.StorageDriver):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.client = client.VMAXClient(**kwargs)
-        self._init_vmax(kwargs)
+        self.client.init_connection(kwargs)
 
-    def _init_vmax(self, access_info):
-        self.client.init_connection(access_info)
+    def reset_connection(self, context, **kwargs):
+        self.client.reset_connection(**kwargs)
 
     def get_storage(self, context):
         # Get the VMAX model
-        model = self.client.get_model()
+        array_details = self.client.get_array_details()
+        model = array_details['model']
+        ucode = array_details['ucode']
+        display_name = array_details['display_name']
 
         # Get Storage details for capacity info
         storg_info = self.client.get_storage_capacity()
@@ -49,10 +53,13 @@ class VMAXStorageDriver(driver.StorageDriver):
         free_cap = total_cap - used_cap
 
         storage = {
-            'name': '',
+            # Unisphere Rest API do not provide Array name .
+            # Generate  name  by combining model and symmetrixId
+            'name': display_name,
             'vendor': 'Dell EMC',
             'description': '',
             'model': model,
+            'firmware_version': ucode,
             'status': constants.StorageStatus.NORMAL,
             'serial_number': self.client.array_id,
             'location': '',
@@ -77,8 +84,15 @@ class VMAXStorageDriver(driver.StorageDriver):
     def remove_trap_config(self, context, trap_config):
         pass
 
-    def parse_alert(self, context, alert):
-        return alert_handler.AlertHandler().parse_alert(context, alert)
+    @staticmethod
+    def parse_alert(context, alert):
+        return snmp_alerts.AlertHandler().parse_alert(context, alert)
 
-    def clear_alert(self, context, alert):
-        pass
+    def clear_alert(self, context, sequence_number):
+        return self.client.clear_alert(sequence_number)
+
+    def list_alerts(self, context, query_para):
+        alert_list = self.client.list_alerts(query_para)
+        alert_model_list = unisphere_alerts.AlertHandler()\
+            .parse_queried_alerts(alert_list)
+        return alert_model_list

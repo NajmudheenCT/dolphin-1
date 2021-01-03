@@ -15,6 +15,7 @@
 from pysnmp.carrier.asyncore.dispatch import AsyncoreDispatcher
 
 from delfin import exception
+from delfin.common import constants
 
 
 def fake_storage_info():
@@ -22,25 +23,23 @@ def fake_storage_info():
         'id': 'abcd-1234-56789',
         'name': 'storage1',
         'vendor': 'fake vendor',
-        'model': 'fake model'
+        'model': 'fake model',
+        'serial_number': 'serial-1234',
     }
 
 
 def fake_alert_model():
-    return {'me_dn': 'abcd-1234-56789',
-            'me_name': 'storage1',
-            'manufacturer': 'fake vendor',
-            'location': 'Component type: location1 '
-                        'Group,Component name: comp1',
-            'event_type': 'topology',
-            'severity': 'warning',
-            'probable_cause': 'Diagnostic '
-                              'event trace triggered.',
-            'me_category': 'storage-subsystem',
-            'native_me_dn': '000192601409',
-            'alarm_id': '1050',
-            'alarm_name':
-                'SAMPLE_ALARM_NAME'
+    return {'alert_id': '1050',
+            'alert_name': 'SAMPLE_ALERT_NAME',
+            'severity': constants.Severity.WARNING,
+            'category': constants.Category.NOT_SPECIFIED,
+            'type': constants.EventType.EQUIPMENT_ALARM,
+            'sequence_number': 79,
+            'description': 'Diagnostic event trace triggered.',
+            'recovery_advice': 'NA',
+            'resource_type': constants.DEFAULT_RESOURCE_TYPE,
+            'location': 'Array id=000192601409,Component type=location1 '
+                        'Group,Component name=comp1,Event source=symmetrix',
             }
 
 
@@ -50,9 +49,9 @@ def fake_v3_alert_source():
             'engine_id': '800000d30300000e112245',
             'username': 'test1',
             'auth_key': 'YWJjZDEyMzQ1Njc=',
-            'auth_protocol': 'md5',
+            'auth_protocol': 'HMACMD5',
             'privacy_key': 'YWJjZDEyMzQ1Njc=',
-            'privacy_protocol': 'des'
+            'privacy_protocol': 'DES'
             }
 
 
@@ -63,9 +62,9 @@ def fake_v3_alert_source_list_with_one():
          'engine_id': '800000d30300000e112245',
          'username': 'test1',
          'auth_key': 'YWJjZDEyMzQ1Njc=',
-         'auth_protocol': 'md5',
+         'auth_protocol': 'HMACMD5',
          'privacy_key': 'YWJjZDEyMzQ1Njc=',
-         'privacy_protocol': 'des'
+         'privacy_protocol': 'DES'
          }
     ]
 
@@ -81,18 +80,18 @@ def fake_v3_alert_source_list():
          'engine_id': '800000d30300000e112245',
          'username': 'test1',
          'auth_key': 'YWJjZDEyMzQ1Njc=',
-         'auth_protocol': 'md5',
+         'auth_protocol': 'HMACMD5',
          'privacy_key': 'YWJjZDEyMzQ1Njc=',
-         'privacy_protocol': 'des'
+         'privacy_protocol': 'DES'
          },
         {'storage_id': 'abcd-1234-5677',
          'version': 'snmpv3',
          'engine_id': '800000d30300000e112246',
          'username': 'test2',
          'auth_key': 'YWJjZDEyMzQ1Njc=',
-         'auth_protocol': 'md5',
+         'auth_protocol': 'HMACMD5',
          'privacy_key': 'YWJjZDEyMzQ1Njc=',
-         'privacy_protocol': 'des'
+         'privacy_protocol': 'DES'
          }
     ]
 
@@ -107,3 +106,7 @@ def load_config_exception(para):
 
 def mock_add_transport(snmpEngine, transportDomain, transport):
     snmpEngine.transportDispatcher = AsyncoreDispatcher()
+
+
+def config_delv3_exception(snmp_engine, username, securityEngineId):
+    raise exception.InvalidResults("Config delete failed.")

@@ -62,7 +62,7 @@ def get_range_val(range_str, t):
         min_val = t(rng[0])
         max_val = t(rng[1])
         return min_val, max_val
-    except exception:
+    except Exception:
         LOG.error("Invalid range: {0}".format(range_str))
         raise exception.InvalidInput
 
@@ -94,6 +94,9 @@ class FakeStorageDriver(driver.StorageDriver):
         MIN_VOLUME, MAX_VOLUME = get_range_val(
             CONF.fake_driver.fake_volume_range, int)
         PAGE_LIMIT = int(CONF.fake_driver.fake_page_query_limit)
+
+    def reset_connection(self, context, **kwargs):
+        pass
 
     @wait_random(MIN_WAIT, MAX_WAIT)
     def get_storage(self, context):
@@ -141,7 +144,6 @@ class FakeStorageDriver(driver.StorageDriver):
 
     def list_volumes(self, ctx):
         # Get a random number as the volume count.
-        # rd_volumes_count = random.randint(MIN_VOLUME, MAX_VOLUME)
         rd_volumes_count = random.randint(MIN_VOLUME, MAX_VOLUME)
         LOG.info("###########fake_volumes number for %s: %d" % (
             self.storage_id, rd_volumes_count))
@@ -162,10 +164,14 @@ class FakeStorageDriver(driver.StorageDriver):
     def remove_trap_config(self, context, trap_config):
         pass
 
-    def parse_alert(self, context, alert):
+    @staticmethod
+    def parse_alert(context, alert):
         pass
 
     def clear_alert(self, context, alert):
+        pass
+
+    def list_alerts(self, context, query_para=None):
         pass
 
     @wait_random(MIN_WAIT, MAX_WAIT)

@@ -12,10 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+from delfin import cryptor
 
 
 def build_alert_source(value):
     view = copy.deepcopy(value)
     view.pop("auth_key")
     view.pop("privacy_key")
+    version = view['version']
+    if version.lower() == 'snmpv2c':
+        view['community_string'] = cryptor.decode(view['community_string'])
+        # Remove the key not belong to snmpv2c
+        view.pop('username')
+        view.pop('security_level')
+        view.pop('auth_protocol')
+        view.pop('privacy_protocol')
+        view.pop('engine_id')
+        view.pop('context_name')
+    elif version.lower() == 'snmpv3':
+        # Remove the key not belong to snmpv3
+        view.pop('community_string')
     return dict(view)

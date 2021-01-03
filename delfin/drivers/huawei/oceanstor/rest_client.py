@@ -16,13 +16,17 @@
 
 import json
 
-from oslo_log import log as logging
 import requests
 import six
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+from oslo_log import log as logging
 
+from delfin import cryptor
 from delfin import exception
-from delfin.i18n import _
 from delfin.drivers.huawei.oceanstor import consts
+from delfin.ssl_utils import HostNameIgnoreAdapter
+from delfin.i18n import _
 
 LOG = logging.getLogger(__name__)
 
@@ -39,13 +43,26 @@ class RestClient(object):
         self.rest_port = rest_access.get('port')
         self.rest_username = rest_access.get('username')
         self.rest_password = rest_access.get('password')
+
         # Lists of addresses to try, for authorization
-        self.san_address = [
-            'https://' + self.rest_host + ':' + self.rest_port +
-            '/deviceManager/rest/']
+        address = 'https://%(host)s:%(port)s/deviceManager/rest/' % \
+                  {'host': self.rest_host, 'port': str(self.rest_port)}
+        self.san_address = [address]
         self.session = None
         self.url = None
         self.device_id = None
+        self.verify = None
+        urllib3.disable_warnings(InsecureRequestWarning)
+        self.reset_connection(**kwargs)
+
+    def reset_connection(self, **kwargs):
+        self.verify = kwargs.get('verify', False)
+        try:
+            self.login()
+        except Exception as ex:
+            msg = "Failed to login to OceanStor: {}".format(ex)
+            LOG.error(msg)
+            raise exception.InvalidCredential(msg)
 
     def init_http_head(self):
         self.url = None
@@ -53,7 +70,14 @@ class RestClient(object):
         self.session.headers.update({
             "Connection": "keep-alive",
             "Content-Type": "application/json"})
-        self.session.verify = False
+        if not self.verify:
+            self.session.verify = False
+        else:
+            LOG.debug("Enable certificate verification, verify: {0}".format(
+                self.verify))
+            self.session.verify = self.verify
+            self.session.mount("https://", HostNameIgnoreAdapter())
+
         self.session.trust_env = False
 
     def do_call(self, url, data, method,
@@ -75,10 +99,18 @@ class RestClient(object):
         else:
             msg = _("Request method %s is invalid.") % method
             LOG.error(msg)
-            raise exception.StorageBackendException(reason=msg)
+            raise exception.StorageBackendException(msg)
 
         try:
             res = func(url, **kwargs)
+        except requests.exceptions.SSLError as e:
+            LOG.error('SSLError exception from server: %(url)s.'
+                      ' Error: %(err)s', {'url': url, 'err': e})
+            err_str = six.text_type(e)
+            if 'certificate verify failed' in err_str:
+                raise exception.SSLCertificateFailed()
+            else:
+                raise exception.SSLHandshakeFailed()
         except Exception as err:
             LOG.exception('Bad response from server: %(url)s.'
                           ' Error: %(err)s', {'url': url, 'err': err})
@@ -110,7 +142,7 @@ class RestClient(object):
         for item_url in self.san_address:
             url = item_url + "xx/sessions"
             data = {"username": self.rest_username,
-                    "password": self.rest_password,
+                    "password": cryptor.decode(self.rest_password),
                     "scope": "0"}
             self.init_http_head()
             result = self.do_call(url, data, 'POST',
@@ -134,13 +166,13 @@ class RestClient(object):
                 msg = _("Password has expired or has been reset, "
                         "please change the password.")
                 LOG.error(msg)
-                raise exception.StorageBackendException(reason=msg)
+                raise exception.StorageBackendException(msg)
             break
 
         if device_id is None:
             msg = _("Failed to login with all rest URLs.")
             LOG.error(msg)
-            raise exception.StorageBackendException(reason=msg)
+            raise exception.StorageBackendException(msg)
 
         return device_id
 
@@ -206,13 +238,13 @@ class RestClient(object):
             msg = (_('%(err)s\nresult: %(res)s.') % {'err': err_str,
                                                      'res': result})
             LOG.error(msg)
-            raise exception.StorageBackendException(reason=msg)
+            raise exception.StorageBackendException(msg)
 
     def _assert_data_in_result(self, result, msg):
         if 'data' not in result:
             err_msg = _('%s "data" is not in result.') % msg
             LOG.error(err_msg)
-            raise exception.StorageBackendException(reason=err_msg)
+            raise exception.StorageBackendException(err_msg)
 
     def get_storage(self):
         url = "/system/"
@@ -241,3 +273,22 @@ class RestClient(object):
     def get_all_pools(self):
         url = "/storagepool"
         return self.paginated_call(url, None, "GET", log_filter_flag=True)
+
+    def clear_alert(self, sequence_number):
+        url = "/alarm/currentalarm?sequence=%s" % sequence_number
+
+        # Result always contains error code and description
+        result = self.call(url, method="DELETE", log_filter_flag=True)
+        if result['error']['code']:
+            msg = 'Clear alert failed with reason: %s.' \
+                  % result['error']['description']
+            raise exception.InvalidResults(msg)
+        return result
+
+    def list_alerts(self):
+        url = "/alarm/currentalarm"
+        result_list = self.paginated_call(url,
+                                          None,
+                                          "GET",
+                                          log_filter_flag=True)
+        return result_list

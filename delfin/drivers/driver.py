@@ -29,6 +29,11 @@ class StorageDriver(object):
         self.storage_id = kwargs.get('storage_id', None)
 
     @abc.abstractmethod
+    def reset_connection(self, context, **kwargs):
+        """ Reset connection with backend with new args """
+        pass
+
+    @abc.abstractmethod
     def get_storage(self, context):
         """Get storage device information from storage system"""
         pass
@@ -53,16 +58,45 @@ class StorageDriver(object):
         """Remove trap receiver configuration from storage system."""
         pass
 
-    @abc.abstractmethod
-    def parse_alert(self, context, alert):
+    @staticmethod
+    def parse_alert(context, alert):
         """Parse alert data got from snmp trap server."""
-        pass
 
-    def list_alerts(self, context):
-        """List all current alerts from storage system."""
+        """
+        Alert Model	Description
+        *****Filled from driver side ***********************
+        alert_id	Unique identification for a given alert type
+        alert_name	Unique name for a given alert type
+        severity	Severity of the alert
+        category	Category of alert generated
+        type	Type of the alert generated
+        sequence_number	Sequence number for the alert, uniquely identifies a
+                                  given alert instance used for
+                                  clearing the alert
+        occur_time	Time at which alert is generated from device in epoch
+                    format
+        description	Possible cause description or other details about
+                                the alert
+        recovery_advice	Some suggestion for handling the given alert
+        resource_type	Resource type of device/source generating alert
+        location	Detailed info about the tracing the alerting device such as
+                    slot, rack, component, parts etc
+        *****************************************************
+        """
+
         pass
 
     @abc.abstractmethod
-    def clear_alert(self, context, alert):
+    def list_alerts(self, context, query_para=None):
+        """List all current alerts from storage system."""
+        """
+        query_para is an optional para which contains 'begin_time' and
+        'end_time' (in milliseconds) which is to be used to filter
+        alerts at driver
+        """
+        pass
+
+    @abc.abstractmethod
+    def clear_alert(self, context, sequence_number):
         """Clear alert from storage system."""
         pass

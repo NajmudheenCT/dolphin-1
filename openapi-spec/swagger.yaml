@@ -902,7 +902,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorSpec'
-  '/v1/storages/{storage_id}/alerts/{alertSequenceNum}':
+  '/v1/storages/{storage_id}/alerts/{sequence_number}':
     delete:
       tags:
         - Alerts
@@ -916,16 +916,14 @@ paths:
           explode: false
           schema:
             type: string
-        - name: alertSequenceNum
+        - name: sequence_number
           in: path
           description: Sequence number which uniquely maps to the trap sent by a backend.
           required: true
           style: simple
           explode: false
           schema:
-            minimum: 0
-            type: integer
-            format: int32
+            type: string
       responses:
         '200':
           description: OK
@@ -960,6 +958,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorSpec'
+  '/v1/storages/{storage_id}/alerts/sync':
+    post:
+      tags:
+        - Alerts
+      description: Sync alerts from storage device
+      operationId: syncStorageAlerts
+      parameters:
+        - name: storage_id
+          in: path
+          description: Database ID created for a storage backend .
+          required: true
+          style: simple
+          explode: false
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/StorageBackendAlertSync'
+      responses:
+        '200':
+          description: 'Accepted, '
+        '400':
+          description: BadRequest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSpec'
+        '401':
+          description: NotAuthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSpec'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSpec'
+        '409':
+          description: An item already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSpec'
+        '500':
+          description: An unexpected error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSpec'
+
 components:
   schemas:
     BaseModel:
@@ -1088,8 +1137,6 @@ components:
         - host
         - port
         - username
-        - pub_key
-        - pub_key_type
       type: object
       properties:
         host:
@@ -1389,6 +1436,28 @@ components:
         host:
           type: string
           example: 10.0.0.1
+        context_name:
+          type: string
+          description: Context name of the alert source
+          example: "New Context"
+        retry_num:
+          type: integer
+          description: >-
+            Maximum number of retries while connecting to alert source
+            By default, set to 1
+          example: 2
+        expiration:
+          type: integer
+          description: >-
+            Expiration time (in sec) for one alert source connect request
+            By default, set to 2
+          example: 60
+        port:
+          type: integer
+          description: >-
+            Port for connecting to alert source
+            By default, set to 161
+          example: 20162
       description: SNMP alert source configuration attributes.
     AlertSourceRespSpec:
       description: Response for snmp alert source configuration.
@@ -1452,6 +1521,44 @@ components:
             host:
               type: string
               example: 10.0.0.1
+            context_name:
+              type: string
+              description: Context name of the alert source
+              example: "New Context"
+            retry_num:
+              type: integer
+              description: >-
+                Maximum number of retries while connecting to alert source
+                By default, set to 1
+              example: 2
+            expiration:
+              type: integer
+              description: >-
+                Expiration time (in sec) for one alert source connect request
+                By default, set to 2
+              example: 60
+            port:
+              type: integer
+              description: >-
+                Port for connecting to alert source
+                By default, set to 161
+              example: 20162
+    StorageBackendAlertSync:
+      type: object
+      properties:
+        begin_time:
+          type: integer
+          format: int64
+            Start time(in milliseconds) for alert sync. It is optional.
+            If not provided, alerts are fetched without filtering start time
+          example: 13577777777777766
+        end_time:
+          type: integer
+          format: int64
+          description: >-
+            End time(in milliseconds) for alert sync. It is optional.
+            If not provided, alerts are fetched without filtering end time
+          example: 13577777777777777
     ErrorSpec:
       required:
         - error_code
@@ -1558,20 +1665,23 @@ components:
         type: integer
         format: int32
           - desc
-    alertSequenceNum:
-      name: alertSequenceNum
+    sequence_number:
+      name: sequence_number
       in: path
       description: Sequence number which uniquely maps to the trap sent by a backend.
       required: true
       style: simple
       explode: false
       schema:
-        minimum: 0
-        type: integer
-        format: int32
+        type: string
   requestBodies:
     AlertSourceUpdateSpec:
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/AlertSourceUpdateSpec'
+    StorageBackendAlertSync:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StorageBackendAlertSync'

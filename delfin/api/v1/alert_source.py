@@ -20,17 +20,17 @@ from delfin import exception
 from delfin.alert_manager import rpcapi
 from delfin.api import validation
 from delfin.api.common import wsgi
-from delfin.api.schemas import alert as schema_alert
-from delfin.api.views import alert as alert_view
+from delfin.api.schemas import alert_source as schema_alert
+from delfin.api.views import alert_source as alert_view
+from delfin.common import constants
 
 LOG = log.getLogger(__name__)
-
 
 SNMPv3_keys = ('username', 'auth_key', 'security_level', 'auth_protocol',
                'privacy_protocol', 'privacy_key', 'engine_id')
 
 
-class AlertController(wsgi.Controller):
+class AlertSourceController(wsgi.Controller):
     def __init__(self):
         super().__init__()
         self.alert_rpcapi = rpcapi.AlertAPI()
@@ -85,35 +85,37 @@ class AlertController(wsgi.Controller):
             engine_id = alert_source.get('engine_id')
 
             # Validate engine_id, check octet string can be formed from it
-            try:
-                OctetString.fromHexString(engine_id)
-            except ValueError:
-                msg = "engine_id should be a set of octets in " \
-                      "hexadecimal format."
-                raise exception.InvalidInput(msg)
+            if engine_id:
+                try:
+                    OctetString.fromHexString(engine_id)
+                except (TypeError, ValueError):
+                    msg = "engine_id should be a set of octets in " \
+                          "hexadecimal format."
+                    raise exception.InvalidInput(msg)
 
-            if not user_name or not security_level or not engine_id:
+            if not user_name or not security_level:
                 msg = "If snmp version is SNMPv3, then username, " \
-                      "security_level and engine_id are required."
+                      "security_level are required."
                 raise exception.InvalidInput(msg)
 
-            if security_level == "AuthNoPriv" or security_level == "AuthPriv":
+            if security_level == constants.SecurityLevel.AUTHNOPRIV\
+                    or security_level == constants.SecurityLevel.AUTHPRIV:
                 auth_protocol = alert_source.get('auth_protocol')
                 auth_key = alert_source.get('auth_key')
                 if not auth_protocol or not auth_key:
                     msg = "If snmp version is SNMPv3 and security_level is " \
-                          "AuthPriv or AuthNoPriv, auth_protocol and " \
+                          "authPriv or authNoPriv, auth_protocol and " \
                           "auth_key are required."
                     raise exception.InvalidInput(msg)
                 alert_source['auth_key'] = cryptor.encode(
                     alert_source['auth_key'])
 
-                if security_level == "AuthPriv":
+                if security_level == constants.SecurityLevel.AUTHPRIV:
                     privacy_protocol = alert_source.get('privacy_protocol')
                     privacy_key = alert_source.get('privacy_key')
                     if not privacy_protocol or not privacy_key:
                         msg = "If snmp version is SNMPv3 and security_level" \
-                              " is AuthPriv, privacy_protocol and " \
+                              " is authPriv, privacy_protocol and " \
                               "privacy_key are  required."
                         raise exception.InvalidInput(msg)
                     alert_source['privacy_key'] = cryptor.encode(
@@ -130,11 +132,13 @@ class AlertController(wsgi.Controller):
             # Clear keys for other versions.
             alert_source['community_string'] = None
         else:
-            community_string = alert_source.get('community_string', None)
+            community_string = alert_source.get('community_string')
             if not community_string:
                 msg = "If snmp version is SNMPv1 or SNMPv2c, " \
                       "community_string is required."
                 raise exception.InvalidInput(msg)
+            alert_source['community_string'] = cryptor.encode(
+                alert_source['community_string'])
 
             # Clear keys for SNMPv3
             for k in SNMPv3_keys:
@@ -172,4 +176,4 @@ class AlertController(wsgi.Controller):
 
 
 def create_resource():
-    return wsgi.Resource(AlertController())
+    return wsgi.Resource(AlertSourceController())

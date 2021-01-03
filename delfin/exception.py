@@ -150,6 +150,10 @@ class AlertSourceNotFoundWithHost(NotFound):
     msg_fmt = _("Alert source could not be found with host {0}.")
 
 
+class SNMPConnectionFailed(BadRequest):
+    msg_fmt = _("Connection to SNMP server failed: {0}")
+
+
 class StorageNotFound(NotFound):
     msg_fmt = _("Storage {0} could not be found.")
 
@@ -205,3 +209,67 @@ class DuplicateExtension(DelfinException):
 
 class ImproperIPVersion(DelfinException):
     msg_fmt = _("Provided improper IP version {0}.")
+
+
+class ConnectTimeout(DelfinException):
+    msg_fmt = _("Connect timeout.")
+    code = 500
+
+
+class InvalidUsernameOrPassword(DelfinException):
+    msg_fmt = _("Invalid username or password.")
+    code = 400
+
+
+class BadResponse(Invalid):
+    msg_fmt = _('Bad response from server')
+    code = 500
+
+
+class InvalidPrivateKey(DelfinException):
+    msg_fmt = _("not a valid RSA private key.")
+    code = 400
+
+
+class SSHConnectTimeout(DelfinException):
+    msg_fmt = _("SSH connect timeout.")
+    code = 500
+
+
+class SSHNotFoundKnownHosts(NotFound):
+    msg_fmt = _("{0} not found in known_hosts.")
+    code = 400
+
+
+class StorageClearAlertFailed(DelfinException):
+    msg_fmt = _("Failed to clear alert. Reason: {0}.")
+
+
+class StorageListAlertFailed(DelfinException):
+    msg_fmt = _("Failed to list alerts. Reason: {0}.")
+
+
+class HTTPConnectionTimeout(DelfinException):
+    msg_fmt = _("HTTP connection timeout: {0}.")
+
+
+class InvalidCAPath(DelfinException):
+    msg_fmt = _("Invalid CA path: {0}.")
+
+
+class SSLCertificateFailed(DelfinException):
+    msg_fmt = _("SSL Certificate Failed.")
+    code = 400
+
+
+class SSLHandshakeFailed(Invalid):
+    msg_fmt = _("SSL handshake failure.")
+
+
+class StorageIsSyncing(Invalid):
+    msg_fmt = _("Storage {0} is syncing now, please try again later.")
+
+
+class InvalidIpOrPort(DelfinException):
+    msg_fmt = _("Invalid ip or port.")
+    code = 400

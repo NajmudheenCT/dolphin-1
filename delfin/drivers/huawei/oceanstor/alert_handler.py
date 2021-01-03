@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 
 from oslo_log import log
 
 from delfin import exception
+from delfin.common import alert_util
+from delfin.common import constants
+from delfin.drivers.huawei.oceanstor import oid_mapper
 from delfin.i18n import _
 
 LOG = log.getLogger(__name__)
@@ -23,77 +27,151 @@ LOG = log.getLogger(__name__)
 
 class AlertHandler(object):
     """Alert handling functions for huawei oceanstor driver"""
-    default_me_category = 'storage-subsystem'
 
-    def __init__(self):
-        pass
+    TIME_PATTERN = "%Y-%m-%d,%H:%M:%S.%f"
 
-    """
-    Alert model contains below fields
-    category : Type of the reported notification
-    occur_time : Time of occurrence of alert. When trap does not contain it,
-                 it will be filled with receive time
-    match_key : This info uniquely identifies the fault point. Several infos
-                such as source system id, location, alarm id together can be
-                used to construct this
-    me_dn : Unique id at resource module (management system) side. me stands
-            for management element here
-    me_name : Unique name at resource module (management system) side
-    native_me_dn : Unique id of the device at source system that reports the
-                   alarm
-    location : Alarm location information. It helps to locate the lowest unit
-               where fault is originated(Name-value pairs)
-               ex: Location = subtrack, No = 1, Slot No = 5.
-                   shelf Id = 1, board type = ADSL
-    event_type : Basic classification of the alarm. Probable values such as
-                 status, configuration, topology ....
-    alarm_id : Identification of alarm
-    alarm_name : Name of the alarm, might need translation from alarm id
-    severity : Severity of alarm. Helps admin to decide on action to be taken
-               Probable values: Critical, Major, Minor, Warning, Info
-    device_alert_sn : Sequence number of alert generated. This will be helpful
-                      during alert clearing process
-    manufacturer : Vendor of the device
-    Product_name : Name of the product
-    probable_cause : Probable reason for alert generation
-    clear_type : Alarm clearance type such as manual, automatic, reset clear
-    me_category : Resource category of the device generating the alarm
-                  Probable value: Network,Server,Storage..
-    """
+    # Translation of trap severity to alert model severity
+    SEVERITY_MAP = {"1": constants.Severity.CRITICAL,
+                    "2": constants.Severity.MAJOR,
+                    "3": constants.Severity.MINOR,
+                    "4": constants.Severity.WARNING}
 
-    def parse_alert(self, context, alert):
-        """Parse alert data got from alert manager and fill the alert model."""
+    # Translation of trap alert category to alert model category
+    CATEGORY_MAP = {"1": constants.Category.FAULT,
+                    "2": constants.Category.RECOVERY,
+                    "3": constants.Category.EVENT}
+
+    # Translation of trap alert category to alert type
+    TYPE_MAP = {
+        "1": constants.EventType.COMMUNICATIONS_ALARM,
+        "2": constants.EventType.EQUIPMENT_ALARM,
+        "3": constants.EventType.PROCESSING_ERROR_ALARM,
+        "4": constants.EventType.QUALITY_OF_SERVICE_ALARM,
+        "5": constants.EventType.ENVIRONMENTAL_ALARM,
+        "6": constants.EventType.QUALITY_OF_SERVICE_ALARM}
+
+    # Translation of severity of queried alerts to alert model severity
+    QUERY_ALERTS_SEVERITY_MAP = {2: constants.Severity.INFORMATIONAL,
+                                 3: constants.Severity.WARNING,
+                                 5: constants.Severity.MAJOR,
+                                 6: constants.Severity.CRITICAL}
+
+    # Translation of alert category of queried alerts to alert model category
+    QUERY_ALERTS_CATEGORY_MAP = {0: constants.Category.EVENT,
+                                 1: constants.Category.FAULT,
+                                 2: constants.Category.RECOVERY}
+
+    # Attributes expected in alert info to proceed with model filling
+    _mandatory_alert_attributes = ('hwIsmReportingAlarmAlarmID',
+                                   'hwIsmReportingAlarmFaultTitle',
+                                   'hwIsmReportingAlarmFaultLevel',
+                                   'hwIsmReportingAlarmNodeCode',
+                                   'hwIsmReportingAlarmFaultType',
+                                   'hwIsmReportingAlarmAdditionInfo',
+                                   'hwIsmReportingAlarmSerialNo',
+                                   'hwIsmReportingAlarmFaultCategory',
+                                   'hwIsmReportingAlarmRestoreAdvice',
+                                   'hwIsmReportingAlarmFaultTime'
+                                   )
+
+    @staticmethod
+    def parse_alert(context, alert):
+        """Parse alert data and fill the alert model."""
+        # Check for mandatory alert attributes
+        alert = oid_mapper.OidMapper.map_oids(alert)
+        LOG.info("Get alert from storage: %s", alert)
+
+        for attr in AlertHandler._mandatory_alert_attributes:
+            if not alert.get(attr):
+                msg = "Mandatory information %s missing in alert message. " \
+                      % attr
+                raise exception.InvalidInput(msg)
 
         try:
-            alert_model = {}
+            alert_model = dict()
             # These information are sourced from device registration info
-            alert_model['me_dn'] = alert['storage_id']
-            alert_model['me_name'] = alert['storage_name']
-            alert_model['manufacturer'] = alert['vendor']
-            alert_model['product_name'] = alert['model']
+            alert_model['alert_id'] = alert['hwIsmReportingAlarmAlarmID']
+            alert_model['alert_name'] = alert['hwIsmReportingAlarmFaultTitle']
+            alert_model['severity'] = AlertHandler.SEVERITY_MAP.get(
+                alert['hwIsmReportingAlarmFaultLevel'],
+                constants.Severity.NOT_SPECIFIED)
+            alert_model['category'] = AlertHandler.CATEGORY_MAP.get(
+                alert['hwIsmReportingAlarmFaultCategory'],
+                constants.Category.NOT_SPECIFIED)
+            alert_model['type'] = AlertHandler.TYPE_MAP.get(
+                alert['hwIsmReportingAlarmFaultType'],
+                constants.EventType.NOT_SPECIFIED)
+            alert_model['sequence_number'] \
+                = alert['hwIsmReportingAlarmSerialNo']
+            occur_time = datetime.strptime(
+                alert['hwIsmReportingAlarmFaultTime'],
+                AlertHandler.TIME_PATTERN)
+            alert_model['occur_time'] = int(occur_time.timestamp() * 1000)
 
-            # Fill default values for alert attributes
-            alert_model['category'] = alert['hwIsmReportingAlarmFaultCategory']
-            alert_model['location'] = alert['hwIsmReportingAlarmLocationInfo']
-            alert_model['event_type'] = alert['hwIsmReportingAlarmFaultType']
-            alert_model['severity'] = alert['hwIsmReportingAlarmFaultLevel']
-            alert_model['probable_cause'] \
-                = alert['hwIsmReportingAlarmAdditionInfo']
-            alert_model['me_category'] = self.default_me_category
-            alert_model['occur_time'] = alert['hwIsmReportingAlarmFaultTime']
-            alert_model['alarm_id'] = alert['hwIsmReportingAlarmAlarmID']
-            alert_model['alarm_name'] = alert['hwIsmReportingAlarmFaultTitle']
-            alert_model['device_alert_sn'] = \
-                alert['hwIsmReportingAlarmSerialNo']
-            alert_model['clear_type'] = ""
-            alert_model['match_key'] = ""
-            alert_model['native_me_dn'] = ""
+            description = alert['hwIsmReportingAlarmAdditionInfo']
+            if AlertHandler._is_hex(description):
+                description = bytes.fromhex(description[2:]).decode('ascii')
+            alert_model['description'] = description
+
+            recovery_advice = alert['hwIsmReportingAlarmRestoreAdvice']
+            if AlertHandler._is_hex(recovery_advice):
+                recovery_advice = bytes.fromhex(
+                    recovery_advice[2:]).decode('ascii')
+
+            alert_model['recovery_advice'] = recovery_advice
+
+            alert_model['resource_type'] = constants.DEFAULT_RESOURCE_TYPE
+            alert_model['location'] = 'Node code=' \
+                                      + alert['hwIsmReportingAlarmNodeCode']
+
+            if alert.get('hwIsmReportingAlarmLocationInfo'):
+                alert_model['location'] \
+                    = alert_model['location'] + ',' + alert[
+                    'hwIsmReportingAlarmLocationInfo']
+
             return alert_model
         except Exception as e:
             LOG.error(e)
             msg = (_("Failed to build alert model as some attributes missing "
                      "in alert message."))
             raise exception.InvalidResults(msg)
+
+    def parse_queried_alerts(self, alert_list, query_para):
+        """Parses list alert data and fill the alert model."""
+        # List contains all the current alarms of given storage id
+        alert_model_list = []
+        for alert in alert_list:
+            try:
+                occur_time = alert['startTime']
+                # skip if alert not in input time range
+                if not alert_util.is_alert_in_time_range(query_para,
+                                                         occur_time):
+                    continue
+
+                alert_model = dict()
+                alert_model['alert_id'] = alert['eventID']
+                alert_model['alert_name'] = alert['name']
+                alert_model['severity'] = self.QUERY_ALERTS_SEVERITY_MAP.get(
+                    alert['level'], constants.Severity.NOT_SPECIFIED)
+                alert_model['category'] = self.QUERY_ALERTS_CATEGORY_MAP.get(
+                    alert['eventType'], constants.Category.NOT_SPECIFIED)
+                alert_model['type'] = constants.EventType.NOT_SPECIFIED
+                alert_model['sequence_number'] = alert['sequence']
+                alert_model['occur_time'] = int(occur_time * 1000)
+                alert_model['description'] = alert['description']
+
+                alert_model['recovery_advice'] = alert['suggestion']
+
+                alert_model['resource_type'] = constants.DEFAULT_RESOURCE_TYPE
+                alert_model['location'] = alert['location']
+
+                alert_model_list.append(alert_model)
+            except Exception as e:
+                LOG.error(e)
+                msg = (_("Failed to build alert model as some attributes"
+                         " missing in queried alerts."))
+                raise exception.InvalidResults(msg)
+        return alert_model_list
 
     def add_trap_config(self, context, storage_id, trap_config):
         """Config the trap receiver in storage system."""
@@ -109,3 +187,11 @@ class AlertHandler(object):
         # Currently not implemented
         """Clear alert from storage system."""
         pass
+
+    @staticmethod
+    def _is_hex(value):
+        try:
+            int(value, 16)
+        except ValueError:
+            return False
+        return True

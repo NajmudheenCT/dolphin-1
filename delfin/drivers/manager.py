@@ -19,9 +19,10 @@ import threading
 
 from oslo_log import log
 
+from delfin import db
 from delfin import exception
 from delfin import utils
-from delfin.drivers import helper
+from delfin import ssl_utils
 
 LOG = log.getLogger(__name__)
 
@@ -53,6 +54,13 @@ class DriverManager(stevedore.ExtensionManager):
         :type cache_on_load: bool
         :param kwargs: Parameters from access_info.
         """
+        kwargs = copy.deepcopy(kwargs)
+        kwargs['verify'] = False
+        ca_path = ssl_utils.get_storage_ca_path()
+        if ca_path:
+            ssl_utils.verify_ca_path(ca_path)
+            kwargs['verify'] = ca_path
+
         if not invoke_on_load:
             return self._get_driver_cls(**kwargs)
         else:
@@ -67,6 +75,8 @@ class DriverManager(stevedore.ExtensionManager):
 
     def _get_driver_obj(self, context, cache_on_load=True, **kwargs):
         if not cache_on_load or not kwargs.get('storage_id'):
+            if kwargs['verify']:
+                ssl_utils.reload_certificate(kwargs['verify'])
             cls = self._get_driver_cls(**kwargs)
             return cls(**kwargs)
 
@@ -77,13 +87,18 @@ class DriverManager(stevedore.ExtensionManager):
             if kwargs['storage_id'] in self.driver_factory:
                 return self.driver_factory[kwargs['storage_id']]
 
+            if kwargs['verify']:
+                ssl_utils.reload_certificate(kwargs['verify'])
             access_info = copy.deepcopy(kwargs)
             storage_id = access_info.pop('storage_id')
+            access_info.pop('verify')
             if access_info:
                 cls = self._get_driver_cls(**kwargs)
                 driver = cls(**kwargs)
             else:
-                access_info = helper.get_access_info(context, storage_id)
+                access_info = db.access_info_get(
+                    context, storage_id).to_dict()
+                access_info['verify'] = kwargs.get('verify')
                 cls = self._get_driver_cls(**access_info)
                 driver = cls(**access_info)
 

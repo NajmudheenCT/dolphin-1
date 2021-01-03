@@ -16,6 +16,7 @@
 from unittest import TestCase, mock
 from delfin import exception
 from delfin import context
+from delfin.common import config # noqa
 from delfin.drivers.huawei.oceanstor.oceanstor import OceanStorDriver, consts
 from delfin.drivers.huawei.oceanstor.rest_client import RestClient
 from requests import Session
@@ -35,7 +36,7 @@ ACCESS_INFO = {
         "host": "10.0.0.1",
         "port": "8443",
         "username": "user",
-        "password": "pass",
+        "password": "cGFzc3dvcmQ=",
     },
     "extra_attributes": {
         "array_id": "00112233"
@@ -88,7 +89,7 @@ class TestOceanStorStorageDriver(TestCase):
             kwargs = ACCESS_INFO
             with self.assertRaises(Exception) as exc:
                 OceanStorDriver(**kwargs)
-            self.assertIn('Exception from Storage Backend', str(exc.exception))
+            self.assertIn('The credentials are invalid', str(exc.exception))
 
     def test_get_storage(self):
         driver = create_driver()

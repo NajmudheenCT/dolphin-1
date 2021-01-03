@@ -12,79 +12,111 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import PyU4V
-
 from oslo_log import log
 from oslo_utils import units
 
 from delfin import exception
 from delfin.common import constants
+from delfin.drivers.dell_emc.vmax import rest
 
 LOG = log.getLogger(__name__)
 
-SUPPORTED_VERSION = '90'
+EMBEDDED_UNISPHERE_ARRAY_COUNT = 1
 
 
 class VMAXClient(object):
     """ Client class for communicating with VMAX storage """
 
     def __init__(self, **kwargs):
-        self.conn = None
+        self.uni_version = None
         self.array_id = None
         rest_access = kwargs.get('rest')
         if rest_access is None:
             raise exception.InvalidInput('Input rest_access is missing')
-        self.rest_host = rest_access.get('host')
-        self.rest_port = rest_access.get('port')
-        self.rest_username = rest_access.get('username')
-        self.rest_password = rest_access.get('password')
+        self.rest = rest.VMaxRest()
+        self.rest.set_rest_credentials(rest_access)
+        self.reset_connection(**kwargs)
 
-    def __del__(self):
-        # De-initialize session
-        if self.conn:
-            self.conn.close_session()
-            self.conn = None
+    def reset_connection(self, **kwargs):
+        """ Reset connection to VMAX storage with new configs """
+        self.rest.verify = kwargs.get('verify', False)
+        self.rest.establish_rest_session()
 
     def init_connection(self, access_info):
         """ Given the access_info get a connection to VMAX storage """
+        try:
+            ver, self.uni_version = self.rest.get_uni_version()
+            LOG.info('Connected to Unisphere Version: {0}'.format(ver))
+        except exception.InvalidUsernameOrPassword as e:
+            msg = "Failed to connect VMAX. Reason: {}".format(e.msg)
+            LOG.error(msg)
+            raise e
+        except (exception.SSLCertificateFailed,
+                exception.SSLHandshakeFailed) as e:
+            msg = ("Failed to connect to VMAX: {}".format(e))
+            LOG.error(msg)
+            raise
+        except Exception as err:
+            msg = ("Failed to connect to VMAX. Host or Port is not correct: "
+                   "{}".format(err))
+            LOG.error(msg)
+            raise exception.InvalidIpOrPort()
+
+        if not self.uni_version:
+            msg = "Invalid input. Failed to get vmax unisphere version"
+            raise exception.InvalidInput(msg)
+
         self.array_id = access_info.get('extra_attributes', {}). \
             get('array_id', None)
-        if not self.array_id:
-            raise exception.InvalidInput('Input array_id is missing')
 
         try:
-            # Initialise PyU4V connection to VMAX
-            self.conn = PyU4V.U4VConn(
-                u4v_version=SUPPORTED_VERSION,
-                server_ip=self.rest_host,
-                port=self.rest_port,
-                verify=False,
-                array_id=self.array_id,
-                username=self.rest_username,
-                password=self.rest_password)
+            # Get array details from unisphere
+            array = self.rest.get_array_detail(version=self.uni_version)
+            if not array:
+                msg = "Failed to get array details"
+                raise exception.InvalidInput(msg)
 
+            if len(array['symmetrixId']) == EMBEDDED_UNISPHERE_ARRAY_COUNT:
+                if not self.array_id:
+                    self.array_id = array['symmetrixId'][0]
+                elif self.array_id != array['symmetrixId'][0]:
+                    msg = "Invalid array_id. Expected id: {}". \
+                        format(array['symmetrixId'])
+                    raise exception.InvalidInput(msg)
+        except exception.SSLCertificateFailed:
+            LOG.error('SSL certificate failed when init connection for VMax')
+            raise
         except Exception as err:
-            msg = "Failed to connect to VMAX: {}".format(err)
-            LOG.error(msg)
+            msg = "Failed to get array details from VMAX: {}".format(err)
             raise exception.StorageBackendException(msg)
 
-    def get_model(self):
+        if not self.array_id:
+            msg = "Input array_id is missing. Supported ids: {}". \
+                format(array['symmetrixId'])
+            raise exception.InvalidInput(msg)
+
+    def get_array_details(self):
         try:
-            # Get the VMAX model
-            uri = "/system/symmetrix/" + self.array_id
-            model = self.conn.common.get_request(uri, "")
-            return model['symmetrix'][0]['model']
+            # Get the VMAX array properties
+            return self.rest.get_vmax_array_details(version=self.uni_version,
+                                                    array=self.array_id)
+        except exception.SSLCertificateFailed:
+            LOG.error('SSL certificate failed when get array info for VMax')
+            raise
         except Exception as err:
-            msg = "Failed to get model from VMAX: {}".format(err)
+            msg = "Failed to get array details from VMAX: {}".format(err)
             LOG.error(msg)
             raise exception.StorageBackendException(msg)
 
     def get_storage_capacity(self):
         try:
-            uri = "/" + SUPPORTED_VERSION \
-                  + "/sloprovisioning/symmetrix/" + self.array_id
-            storage_info = self.conn.common.get_request(uri, "")
+            storage_info = self.rest.get_system_capacity(
+                self.array_id, self.uni_version)
             return storage_info
+        except exception.SSLCertificateFailed:
+            LOG.error('SSL certificate failed when '
+                      'get storage capacity for VMax')
+            raise
         except Exception as err:
             msg = "Failed to get capacity from VMAX: {}".format(err)
             LOG.error(msg)
@@ -94,16 +126,18 @@ class VMAXClient(object):
 
         try:
             # Get list of SRP pool names
-            pools = self.conn.provisioning.get_srp_list()
+            pools = self.rest.get_srp_by_name(
+                self.array_id, self.uni_version, srp='')['srpId']
 
             pool_list = []
             for pool in pools:
-                pool_info = self.conn.provisioning.get_srp(pool)
+                pool_info = self.rest.get_srp_by_name(
+                    self.array_id, self.uni_version, srp=pool)
 
                 srp_cap = pool_info['srp_capacity']
                 total_cap = srp_cap['usable_total_tb'] * units.Ti
                 used_cap = srp_cap['usable_used_tb'] * units.Ti
-
+                subscribed_cap = srp_cap['subscribed_total_tb'] * units.Ti
                 p = {
                     "name": pool,
                     "storage_id": storage_id,
@@ -114,11 +148,15 @@ class VMAXClient(object):
                     "total_capacity": int(total_cap),
                     "used_capacity": int(used_cap),
                     "free_capacity": int(total_cap - used_cap),
+                    "subscribed_capacity": int(subscribed_cap),
                 }
                 pool_list.append(p)
 
             return pool_list
 
+        except exception.SSLCertificateFailed:
+            LOG.error('SSL certificate failed when list pools for VMax')
+            raise
         except Exception as err:
             msg = "Failed to get pool metrics from VMAX: {}".format(err)
             LOG.error(msg)
@@ -127,9 +165,13 @@ class VMAXClient(object):
     def list_volumes(self, storage_id):
 
         try:
+            # Get default SRPs assigned for the array
+            default_srps = self.rest.get_default_srps(
+                self.array_id, version=self.uni_version)
             # List all volumes except data volumes
-            volumes = self.conn.provisioning.get_volume_list(
-                filters={'data_volume': 'false'})
+            volumes = self.rest.get_volume_list(
+                self.array_id, version=self.uni_version,
+                params={'data_volume': 'false'})
 
             # TODO: Update constants.VolumeStatus to make mapping more precise
             switcher = {
@@ -143,8 +185,10 @@ class VMAXClient(object):
             volume_list = []
             for volume in volumes:
                 # Get volume details
-                vol = self.conn.provisioning.get_volume(volume)
+                vol = self.rest.get_volume(self.array_id,
+                                           self.uni_version, volume)
 
+                emulation_type = vol['emulation']
                 total_cap = vol['cap_mb'] * units.Mi
                 used_cap = (total_cap * vol['allocated_percent']) / 100.0
                 free_cap = total_cap - used_cap
@@ -156,8 +200,12 @@ class VMAXClient(object):
                 if vol['type'] == 'TDEV':
                     description = "Dell EMC VMAX 'thin device' volume"
 
+                name = volume
+                if vol.get('volume_identifier'):
+                    name = volume + ':' + vol['volume_identifier']
+
                 v = {
-                    "name": volume,
+                    "name": name,
                     "storage_id": storage_id,
                     "description": description,
                     "status": status,
@@ -171,17 +219,31 @@ class VMAXClient(object):
 
                 if vol['num_of_storage_groups'] == 1:
                     sg = vol['storageGroupId'][0]
-                    sg_info = self.conn.provisioning.get_storage_group(sg)
+                    sg_info = self.rest.get_storage_group(
+                        self.array_id, self.uni_version, sg)
                     v['native_storage_pool_id'] = sg_info['srp']
                     v['compressed'] = sg_info['compression']
-
-                # TODO: Workaround when SG is, not available/not unique
+                else:
+                    v['native_storage_pool_id'] = default_srps[emulation_type]
 
                 volume_list.append(v)
 
             return volume_list
 
+        except exception.SSLCertificateFailed:
+            LOG.error('SSL certificate failed when list volumes for VMax')
+            raise
         except Exception as err:
             msg = "Failed to get list volumes from VMAX: {}".format(err)
             LOG.error(msg)
             raise exception.StorageBackendException(msg)
+
+    def list_alerts(self, query_para):
+        """Get all alerts from an array."""
+        return self.rest.get_alerts(query_para, version=self.uni_version,
+                                    array=self.array_id)
+
+    def clear_alert(self, sequence_number):
+        """Clear alert for given sequence number."""
+        return self.rest.clear_alert(sequence_number, version=self.uni_version,
+                                     array=self.array_id)

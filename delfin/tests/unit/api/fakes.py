@@ -14,18 +14,16 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_service import wsgi
-
 import routes
 import webob.dec
 import webob.request
-
-from delfin.db.sqlalchemy import models
+from oslo_service import wsgi
 
 from delfin import context
 from delfin import exception
 from delfin.api.common import wsgi as os_wsgi
 from delfin.common import config, constants  # noqa
+from delfin.db.sqlalchemy import models
 
 
 @webob.dec.wsgify
@@ -72,7 +70,9 @@ def fake_storages_get_all(context, marker=None, limit=None, sort_keys=None,
             "description": "it is a fake driver.",
             "serial_number": "2102453JPN12KA0000113",
             "used_capacity": 3126,
-            "total_capacity": 1048576
+            "total_capacity": 1048576,
+            'raw_capacity': 1610612736000,
+            'subscribed_capacity': 219902325555200
         },
         {
             "id": "277a1d8f-a36e-423e-bdd9-db154f32c289",
@@ -89,7 +89,10 @@ def fake_storages_get_all(context, marker=None, limit=None, sort_keys=None,
             "description": "it is a fake driver.",
             "serial_number": "2102453JPN12KA0000112",
             "used_capacity": 3126,
-            "total_capacity": 1048576
+            "total_capacity": 1048576,
+            'raw_capacity': 1610612736000,
+            'subscribed_capacity': 219902325555200
+
         }
     ]
 
@@ -113,7 +116,9 @@ def fake_storages_get_all_with_filter(
             "description": "it is a fake driver.",
             "serial_number": "2102453JPN12KA0000113",
             "used_capacity": 3126,
-            "total_capacity": 1048576
+            "total_capacity": 1048576,
+            'raw_capacity': 1610612736000,
+            'subscribed_capacity': 219902325555200
         }
     ]
 
@@ -134,7 +139,9 @@ def fake_storages_show(context, storage_id):
         "description": "it is a fake driver.",
         "serial_number": "2102453JPN12KA0000113",
         "used_capacity": 3126,
-        "total_capacity": 1048576
+        "total_capacity": 1048576,
+        'raw_capacity': 1610612736000,
+        'subscribed_capacity': 219902325555200
     }
 
 
@@ -165,20 +172,28 @@ def fake_sync(self, req, id):
 def fake_v3_alert_source_config():
     return {'host': '127.0.0.1',
             'version': 'snmpv3',
-            'security_level': 'AuthPriv',
+            'security_level': 'authPriv',
             'engine_id': '800000d30300000e112245',
             'username': 'test1',
             'auth_key': 'abcd123456',
-            'auth_protocol': 'md5',
+            'auth_protocol': 'HMACMD5',
             'privacy_key': 'abcd123456',
-            'privacy_protocol': 'des'
+            'privacy_protocol': 'DES',
+            'context_name': 'NA',
+            'retry_num': 2,
+            'expiration': 2,
+            'port': 161
             }
 
 
 def fake_v2_alert_source_config():
     return {'host': '127.0.0.1',
             'version': 'snmpv2c',
-            'community_string': 'public'
+            'community_string': 'public',
+            'context_name': 'NA',
+            'retry_num': 2,
+            'expiration': 2,
+            'port': 161
             }
 
 
@@ -190,9 +205,13 @@ def fake_v3_alert_source():
     alert_source.engine_id = '800000d30300000e112245'
     alert_source.username = 'test1'
     alert_source.auth_key = 'YWJjZDEyMzQ1Njc='
-    alert_source.auth_protocol = 'md5'
+    alert_source.auth_protocol = 'HMACMD5'
     alert_source.privacy_key = 'YWJjZDEyMzQ1Njc='
-    alert_source.privacy_protocol = 'des'
+    alert_source.privacy_protocol = 'DES'
+    alert_source.port = 161
+    alert_source.context_name = ""
+    alert_source.retry_num = 1
+    alert_source.expiration = 1
     alert_source.created_at = '2020-06-15T09:50:31.698956'
     alert_source.updated_at = '2020-06-15T09:50:31.698956'
     return alert_source
@@ -203,9 +222,13 @@ def fake_v3_alert_source_noauth_nopriv():
     alert_source.host = '127.0.0.1'
     alert_source.storage_id = 'abcd-1234-5678'
     alert_source.version = 'snmpv3'
-    alert_source.security_level = 'NoAuthNoPriv'
+    alert_source.security_level = 'noAuthnoPriv'
     alert_source.engine_id = '800000d30300000e112245'
     alert_source.username = 'test1'
+    alert_source.port = 161
+    alert_source.context_name = ""
+    alert_source.retry_num = 1
+    alert_source.expiration = 1
     alert_source.created_at = '2020-06-15T09:50:31.698956'
     alert_source.updated_at = '2020-06-15T09:50:31.698956'
     return alert_source
@@ -216,10 +239,14 @@ def fake_v3_alert_source_auth_nopriv():
     alert_source.host = '127.0.0.1'
     alert_source.storage_id = 'abcd-1234-5678'
     alert_source.version = 'snmpv3'
-    alert_source.security_level = 'AuthNoPriv'
-    alert_source.auth_protocol = 'md5'
+    alert_source.security_level = 'authNoPriv'
+    alert_source.auth_protocol = 'HMACMD5'
     alert_source.engine_id = '800000d30300000e112245'
     alert_source.username = 'test1'
+    alert_source.port = 161
+    alert_source.context_name = ""
+    alert_source.retry_num = 1
+    alert_source.expiration = 1
     alert_source.created_at = '2020-06-15T09:50:31.698956'
     alert_source.updated_at = '2020-06-15T09:50:31.698956'
     return alert_source
@@ -231,6 +258,10 @@ def fake_v2_alert_source():
     alert_source.storage_id = 'abcd-1234-5678'
     alert_source.version = 'snmpv2c'
     alert_source.community_string = 'public'
+    alert_source.port = 161
+    alert_source.context_name = ""
+    alert_source.retry_num = 1
+    alert_source.expiration = 1
     alert_source.created_at = '2020-06-15T09:50:31.698956'
     alert_source.updated_at = '2020-06-15T09:50:31.698956'
     return alert_source
@@ -358,7 +389,8 @@ def fake_storage_pool_get_all(context, marker=None,
             "storage_type": "block",
             "total_capacity": 26300318136401,
             "used_capacity": 19054536509358,
-            "free_capacity": 7245781627043
+            "free_capacity": 7245781627043,
+            'subscribed_capacity': 219902325555200
         }
     ]
 
@@ -376,5 +408,18 @@ def fake_storage_pool_show(context, storage_pool_id):
         "storage_type": "block",
         "total_capacity": 26300318136401,
         "used_capacity": 19054536509358,
-        "free_capacity": 7245781627043
+        "free_capacity": 7245781627043,
+        'subscribed_capacity': 219902325555200
     }
+
+
+def fake_storage_get_exception(ctx, storage_id):
+    raise exception.StorageNotFound('abcd-1234-5678')
+
+
+def fake_getcmd_exception(auth_data, transport_target, *var_names, **kwargs):
+    return "Connection failed", None, None, None
+
+
+def fake_getcmd_success(auth_data, transport_target, *var_names, **kwargs):
+    return None, None, None, None
