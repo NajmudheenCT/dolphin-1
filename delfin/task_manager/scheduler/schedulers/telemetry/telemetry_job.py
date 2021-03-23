@@ -42,6 +42,22 @@ class TelemetryJob(object):
     def __call__(self, ctx):
         """ Schedule the collection tasks based on interval """
         try:
+            # Remove jobs from scheduler  for deleted tasks
+            filters = {'deleted': True}
+            tasks = db.task_get_all(ctx, filters=filters)
+            LOG.debug(" total tasks found deleted "
+                      "in this cycle:%s" % len(tasks))
+            for task in tasks:
+                job_id = task['job_id']
+                # check if job already scheduled
+                if job_id and self.scheduler.get_job(job_id):
+                    # remove the job
+                    self.scheduler.remove_job(job_id)
+                db.task_delete(ctx, task['id'])
+        except Exception as e:
+            LOG.error("Failed to remove periodic scheduling job , reason: %s.",
+                      six.text_type(e))
+        try:
 
             filters = {'last_run_time': None}
             tasks = db.task_get_all(ctx, filters=filters)

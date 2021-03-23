@@ -28,7 +28,7 @@ from oslo_config import cfg
 from oslo_log import log
 
 from delfin.common import config  # noqa
-from delfin import service
+from delfin import service, db
 from delfin import utils
 from delfin import version
 
@@ -41,6 +41,7 @@ def main():
          version=version.version_string())
     log.setup(CONF, "delfin")
     utils.monkey_patch()
+    db.register_db()
 
     launcher = service.process_launcher()
     api_server = service.WSGIService('delfin', coordination=True)

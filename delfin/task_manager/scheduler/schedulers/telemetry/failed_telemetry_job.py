@@ -41,6 +41,22 @@ class FailedTelemetryJob(object):
         :return:
         """
         try:
+            # Remove jobs from scheduler  for deleted failed_tasks
+            filters = {'deleted': True}
+            failed_tasks = db.failed_task_get_all(self.ctx, filters=filters)
+            LOG.debug(" total failed_tasks found deleted "
+                      "in this cycle:%s" % len(failed_tasks))
+            for failed_task in failed_tasks:
+                job_id = failed_task['job_id']
+                # check if job exists
+                if job_id and self.scheduler.get_job(job_id):
+                    # remove the job
+                    self.scheduler.remove_job(job_id)
+                db.task_delete(self.ctx, failed_task['id'])
+        except Exception as e:
+            LOG.error("Failed to remove periodic scheduling job , reason: %s.",
+                      six.text_type(e))
+        try:
             # create the object of periodic scheduler
             failed_tasks = db.failed_task_get_all(self.ctx)
 
