@@ -307,9 +307,9 @@ class TelemetryCollection(object):
                               "telemetry.performance_collection_handler." \
                               "PerformanceCollectionHandler"
     """Performance monitoring job interval"""
-    PERIODIC_JOB_INTERVAL = 180
+    PERIODIC_JOB_INTERVAL = 18
     """Failed Performance monitoring job interval"""
-    FAILED_JOB_SCHEDULE_INTERVAL = 240
+    FAILED_JOB_SCHEDULE_INTERVAL = 24
     """Failed Performance monitoring retry count"""
     MAX_FAILED_JOB_RETRY_COUNT = 5
     """Default performance collection interval"""

@@ -16,6 +16,7 @@
 **periodical task manager**
 
 """
+from delfin.exporter import base_exporter
 from oslo_log import log
 from oslo_utils import importutils
 
@@ -34,6 +35,7 @@ class TaskManager(manager.Manager):
     def __init__(self, service_name=None, *args, **kwargs):
         self.alert_task = alerts.AlertSyncTask()
         self.telemetry_task = telemetry.TelemetryTask()
+        self.perf_exporter = base_exporter.PerformanceExporterManager()
         super(TaskManager, self).__init__(*args, **kwargs)
 
     def sync_storage_resource(self, context, storage_id, resource_task):
@@ -82,3 +84,12 @@ class TaskManager(manager.Manager):
         return self.alert_task.clear_alerts(context,
                                             storage_id,
                                             sequence_number_list)
+
+    def push_metrics(self, context, msg):
+        # LOG.debug("Received the sync_storage task: {0} requestmsg"
+        #           " id:{0}".format(msg))
+        # print("Received the sync_storage task: {0} requestmsg"
+        #       " id:{0}".format(msg))
+
+        self.perf_exporter.dispatch(context, msg)
+        return True

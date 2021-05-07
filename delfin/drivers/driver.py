@@ -14,6 +14,7 @@
 
 import six
 import abc
+from delfin.task_manager import rpcapi as task_rpcapi
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -27,6 +28,7 @@ class StorageDriver(object):
             instead of save them in memory directly.
         """
         self.storage_id = kwargs.get('storage_id', None)
+        self.task_rpcapi = task_rpcapi.TaskAPI()
 
     @abc.abstractmethod
     def reset_connection(self, context, **kwargs):
@@ -178,3 +180,7 @@ class StorageDriver(object):
     def get_capabilities(context):
         """Get capability of driver"""
         pass
+
+    def push_metrics(self, context, msg):
+        self.task_rpcapi.push_metrics(
+            context, msg)

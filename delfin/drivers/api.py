@@ -21,12 +21,14 @@ from delfin import db
 from delfin.drivers import helper
 from delfin.drivers import manager
 
+
 LOG = log.getLogger(__name__)
 
 
 class API(object):
     def __init__(self):
         self.driver_manager = manager.DriverManager()
+        # self.task_rpcapi = task_rpcapi.TaskAPI()
 
     def discover_storage(self, context, access_info):
         """Discover a storage system with access information."""
@@ -73,6 +75,8 @@ class API(object):
     def get_storage(self, context, storage_id):
         """Get storage device information from storage system"""
         driver = self.driver_manager.get_driver(context, storage_id=storage_id)
+        # self.task_rpcapi.push_metrics(
+        #     context, " metrics from driver")
         return driver.get_storage(context)
 
     def list_storage_pools(self, context, storage_id):

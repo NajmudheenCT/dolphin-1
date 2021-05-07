@@ -501,8 +501,10 @@ class FakeStorageDriver(driver.StorageDriver):
                 m = constants.metric_struct(name=key, labels=labels,
                                             values=fake_metrics[key])
                 array_metrics.append(m)
+                print('pushing ->', m)
+                self.push_metrics(context, m)
 
-        return array_metrics
+        return True
 
     @staticmethod
     def get_capabilities(context):

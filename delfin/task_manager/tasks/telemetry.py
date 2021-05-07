@@ -46,25 +46,15 @@ class PerformanceCollectionTask(TelemetryTask):
             LOG.debug("Performance collection for storage [%s] with start time"
                       " [%s] and end time [%s]"
                       % (storage_id, start_time, end_time))
-            perf_metrics = self.driver_api \
+            status = self.driver_api \
                 .collect_perf_metrics(ctx, storage_id,
                                       args,
                                       start_time, end_time)
 
-            # Fill extra labels to metric by fetching metadata from resource DB
-            try:
-                storage_details = db.storage_get(ctx, storage_id)
-                for m in perf_metrics:
-                    m.labels["name"] = storage_details.name
-                    m.labels["serial_number"] = storage_details.serial_number
-            except Exception as e:
-                msg = _('Failed to add extra labels to performance '
-                        'metrics: {0}'.format(e))
-                LOG.error(msg)
+            if status != TelemetryTaskStatus.TASK_EXEC_STATUS_SUCCESS:
                 return TelemetryTaskStatus.TASK_EXEC_STATUS_FAILURE
-
-            self.perf_exporter.dispatch(context, perf_metrics)
             return TelemetryTaskStatus.TASK_EXEC_STATUS_SUCCESS
+
         except Exception as e:
             LOG.error("Failed to collect performance metrics for "
                       "storage id :{0}, reason:{1}".format(storage_id,
