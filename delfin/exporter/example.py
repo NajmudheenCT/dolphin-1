@@ -25,4 +25,4 @@ class AlertExporterExample(base_exporter.BaseExporter):
 
 class PerformanceExporterExample(base_exporter.BaseExporter):
     def dispatch(self, ctxt, data):
-        LOG.info("PerformanceExporterExample, report data: %s" % data)
+        LOG.debug("PerformanceExporterExample, report data: %s" % data)

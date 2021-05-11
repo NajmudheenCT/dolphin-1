@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import datetime
 
 import six
 from oslo_log import log
@@ -46,11 +47,16 @@ class PerformanceCollectionTask(TelemetryTask):
             LOG.debug("Performance collection for storage [%s] with start time"
                       " [%s] and end time [%s]"
                       % (storage_id, start_time, end_time))
+            time1 = datetime.datetime.now()
+
             status = self.driver_api \
                 .collect_perf_metrics(ctx, storage_id,
                                       args,
                                       start_time, end_time)
 
+            time2 = datetime.datetime.now()
+
+            print('Total Time taken for Perf collection:', time2 - time1)
             if status != TelemetryTaskStatus.TASK_EXEC_STATUS_SUCCESS:
                 return TelemetryTaskStatus.TASK_EXEC_STATUS_FAILURE
             return TelemetryTaskStatus.TASK_EXEC_STATUS_SUCCESS

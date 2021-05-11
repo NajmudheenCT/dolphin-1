@@ -47,19 +47,28 @@ CONF.register_opts(fake_opts, "fake_driver")
 
 LOG = log.getLogger(__name__)
 
-MIN_WAIT, MAX_WAIT = 0.1, 0.5
-MIN_POOL, MAX_POOL = 1, 100
-MIN_PORTS, MAX_PORTS = 1, 10
-MIN_DISK, MAX_DISK = 1, 100
-MIN_VOLUME, MAX_VOLUME = 1, 2000
-MIN_CONTROLLERS, MAX_CONTROLLERS = 1, 5
+MIN_WAIT, MAX_WAIT = 0.5, 0.5
+MIN_POOL, MAX_POOL = 100, 100
+MIN_PORTS, MAX_PORTS = 100, 100
+MIN_DISK, MAX_DISK = 100, 100
+MIN_VOLUME, MAX_VOLUME = 2000, 2000
+MIN_CONTROLLERS, MAX_CONTROLLERS = 4, 4
 PAGE_LIMIT = 500
 MIN_STORAGE, MAX_STORAGE = 1, 10
-MIN_PERF_VALUES, MAX_PERF_VALUES = 1, 4
+MIN_PERF_VALUES, MAX_PERF_VALUES = 100, 100
 MIN_QUOTA, MAX_QUOTA = 1, 100
 MIN_FS, MAX_FS = 1, 10
 MIN_QTREE, MAX_QTREE = 1, 100
 MIN_SHARE, MAX_SHARE = 1, 100
+RESOURCE_DICT = {
+    "storage": 1,
+    "storage_pool": 100,
+    "volume": 2000,
+    "ports": 100,
+    "controller": 4,
+    "disk": 100,
+
+}
 
 
 def get_range_val(range_str, t):
@@ -471,9 +480,9 @@ class FakeStorageDriver(driver.StorageDriver):
     def _get_random_performance(self):
         def get_random_timestamp_value():
             rtv = {}
-            for i in range(MIN_PERF_VALUES, MAX_PERF_VALUES):
+            for i in range(MAX_PERF_VALUES):
                 timestamp = int(float(datetime.datetime.now().timestamp()
-                                      ) * 1000)
+                                      ) * 1000)+i
                 rtv[timestamp] = random.uniform(1, 100)
             return rtv
 
@@ -489,21 +498,25 @@ class FakeStorageDriver(driver.StorageDriver):
                              resource_metrics, start_time,
                              end_time):
         """Collects performance metric for the given interval"""
-        rd_array_count = random.randint(MIN_STORAGE, MAX_STORAGE)
-        LOG.debug("Fake_perf_metrics number for %s: %d" % (
-            storage_id, rd_array_count))
+        total_metric = 0
         array_metrics = []
-        labels = {'storage_id': storage_id, 'resource_type': 'array'}
-        fake_metrics = self._get_random_performance()
+        for resource_key in RESOURCE_DICT:
+            metric_count = RESOURCE_DICT[resource_key]
+            labels = {'storage_id': storage_id, 'resource_type': resource_key}
+            fake_metrics = self._get_random_performance()
+            for i in range(metric_count):
 
-        for _ in range(rd_array_count):
-            for key in constants.DELFIN_ARRAY_METRICS:
-                m = constants.metric_struct(name=key, labels=labels,
-                                            values=fake_metrics[key])
-                array_metrics.append(m)
-                print('pushing ->', m)
-                self.push_metrics(context, m)
+                for key in constants.DELFIN_ARRAY_METRICS:
+                    labels['resource_id'] = str(i)
 
+                    m = constants.metric_struct(name=key + '_' + resource_key, labels=labels,
+                                                values=fake_metrics[key])
+                    array_metrics.append(m)
+                    # print('pushing-> ')
+                    self.push_metrics(context,m)
+                    total_metric += 1
+
+        print("total_metrics for storage: ", storage_id, "=", total_metric)
         return True
 
     @staticmethod

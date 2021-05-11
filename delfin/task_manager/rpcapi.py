@@ -15,6 +15,7 @@
 """
 Client side of the task manager RPC API.
 """
+import time
 
 import oslo_messaging as messaging
 from oslo_config import cfg
@@ -93,7 +94,9 @@ class TaskAPI(object):
                                  sequence_number_list=sequence_number_list)
 
     def push_metrics(self, ctxt, msg):
+        time.sleep(0.001)
         call_context = self.client.prepare(version='1.0', fanout=True)
+
         return call_context.cast(ctxt,
                                  'push_metrics',
                                  msg=msg,
