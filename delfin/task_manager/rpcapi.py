@@ -93,11 +93,3 @@ class TaskAPI(object):
                                  storage_id=storage_id,
                                  sequence_number_list=sequence_number_list)
 
-    def push_metrics(self, ctxt, msg):
-        time.sleep(0.001)
-        call_context = self.client.prepare(version='1.0', fanout=True)
-
-        return call_context.cast(ctxt,
-                                 'push_metrics',
-                                 msg=msg,
-                                 )

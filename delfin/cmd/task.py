@@ -20,6 +20,8 @@
 """Starter script for delfin task service."""
 
 import eventlet
+
+
 eventlet.monkey_patch()
 
 import sys

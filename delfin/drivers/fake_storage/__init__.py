@@ -65,7 +65,7 @@ RESOURCE_DICT = {
     "storage_pool": 100,
     "volume": 2000,
     "ports": 100,
-    "controller": 4,
+    "controller": 5,
     "disk": 100,
 
 }
@@ -482,7 +482,7 @@ class FakeStorageDriver(driver.StorageDriver):
             rtv = {}
             for i in range(MAX_PERF_VALUES):
                 timestamp = int(float(datetime.datetime.now().timestamp()
-                                      ) * 1000)+i
+                                      ) * 1000) + i
                 rtv[timestamp] = random.uniform(1, 100)
             return rtv
 
@@ -513,7 +513,7 @@ class FakeStorageDriver(driver.StorageDriver):
                                                 values=fake_metrics[key])
                     array_metrics.append(m)
                     # print('pushing-> ')
-                    self.push_metrics(context,m)
+                    self.push_metrics(context, m)
                     total_metric += 1
 
         print("total_metrics for storage: ", storage_id, "=", total_metric)

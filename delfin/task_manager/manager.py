@@ -85,11 +85,4 @@ class TaskManager(manager.Manager):
                                             storage_id,
                                             sequence_number_list)
 
-    def push_metrics(self, context, msg):
-        # LOG.debug("Received the sync_storage task: {0} requestmsg"
-        #           " id:{0}".format(msg))
-        # print("Received the sync_storage task: {0} requestmsg"
-        #       " id:{0}".format(msg))
 
-        self.perf_exporter.dispatch(context, msg)
-        return True
