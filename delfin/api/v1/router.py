@@ -46,6 +46,10 @@ class APIRouter(common.APIRouter):
                        action="sync_all",
                        conditions={"method": ["POST"]})
 
+        mapper.connect("storages", "/storages/{id}/telemetry",
+                       controller=self.resources['storages'],
+                       action="config_telemetry",
+                       conditions={"method": ["POST"]})
         mapper.connect("storages", "/storages/{id}/capabilities",
                        controller=self.resources['storages'],
                        action="get_capabilities",

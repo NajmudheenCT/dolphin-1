@@ -113,23 +113,6 @@ class StorageController(wsgi.Controller):
                     'Error: %(err)s') % {'storage': storage['id'], 'err': e}
             LOG.error(msg)
 
-        try:
-            # Trigger Performance monitoring
-            capabilities = self.driver_api.get_capabilities(
-                context=ctxt, storage_id=storage['id'])
-            validation.validate_capabilities(capabilities)
-            _create_performance_monitoring_task(ctxt, storage['id'],
-                                                capabilities)
-        except exception.EmptyResourceMetrics:
-            msg = _("Resource metric provided by capabilities is empty for "
-                    "storage: %s") % storage['id']
-            LOG.info(msg)
-        except Exception as e:
-            # Unexpected error occurred, while performance monitoring.
-            msg = _('Failed to trigger performance monitoring for storage: '
-                    '%(storage)s. Error: %(err)s') % {'storage': storage['id'],
-                                                      'err': six.text_type(e)}
-            LOG.error(msg)
         return storage_view.build_storage(storage)
 
     @wsgi.response(202)
@@ -198,6 +181,28 @@ class StorageController(wsgi.Controller):
                 storage['id'],
                 subclass.__module__ + '.' + subclass.__name__)
 
+    @wsgi.response(202)
+    def config_telemetry(self, req, id):
+        print('inside config telemetry')
+        ctxt = req.environ['delfin.context']
+        try:
+            # Trigger Performance monitoring
+            capabilities = self.driver_api.get_capabilities(
+                context=ctxt, storage_id=id)
+            validation.validate_capabilities(capabilities)
+            _create_performance_monitoring_task(ctxt, id,
+                                                capabilities)
+        except exception.EmptyResourceMetrics:
+            msg = _("Resource metric provided by capabilities is empty for "
+                    "storage: %s") % id
+            LOG.info(msg)
+        except Exception as e:
+            # Unexpected error occurred, while performance monitoring.
+            msg = _('Failed to trigger performance monitoring for storage: '
+                    '%(storage)s. Error: %(err)s') % {'storage': id,
+                                                      'err': six.text_type(e)}
+            LOG.error(msg)
+
     def _storage_exist(self, context, access_info):
         access_info_dict = copy.deepcopy(access_info)
 
@@ -239,7 +244,7 @@ class StorageController(wsgi.Controller):
         storage_info = db.storage_get(ctx, id)
 
         # Fetch supported driver's capability
-        capabilities = self.driver_api.\
+        capabilities = self.driver_api. \
             get_capabilities(ctx, storage_info['id'])
 
         # validate capabilities
