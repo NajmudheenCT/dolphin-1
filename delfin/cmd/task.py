@@ -45,18 +45,16 @@ def main():
     storage_id = 'f25f801e-416d-452d-a2c4-c75e7d86e91a'
     # storage_id = 'fecaf3f7-8001-48ba-8787-5fe02934e75c'
 
-
-
-    # task_server = service.TaskService.create(binary='delfin-task', topic='delfin-task',
-    #                                          manager='delfin.task_manager.manager.TaskManager',
-    #                                          coordination=True)
-    # leader_election = service.LeaderElectionService.create()
+    task_server = service.TaskService.create(binary='delfin-task', topic='delfin-task',
+                                             manager='delfin.task_manager.manager.TaskManager',
+                                             coordination=True)
+    leader_election = service.LeaderElectionService.create()
     metrics_task_server = service.TaskService.create(binary='delfin-task', topic='2',
                                                      manager='delfin.task_manager.metrics_manager.MetricsTaskManager',
                                                      coordination=True)
 
-    # service.serve(task_server)
-    # service.serve(leader_election)
+    service.serve(task_server)
+    service.serve(leader_election)
     service.serve(metrics_task_server)
 
     service.wait()

@@ -36,9 +36,7 @@ class MetricsTaskManager(manager.Manager):
         self.telemetry_task = telemetry.TelemetryTask()
         super(MetricsTaskManager, self).__init__(*args, **kwargs)
         scheduler = schedule_manager.SchedulerManager()
-        scheduler.boot_jobs_scheduled = True
-        if not scheduler.scheduler_started:
-            scheduler.start()
+        scheduler.start()
 
     def addJob1(self, context, msg, task_id):
         LOG.info('Addd job message:{0}'
