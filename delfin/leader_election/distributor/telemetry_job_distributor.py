@@ -47,6 +47,7 @@ class TelemetryJob(object):
 
     def __call__(self):
         """ Schedule the collection tasks based on interval """
+        print('............Naju Call back recieved for job distribution')
 
         if self.stopped:
             """If Job is stopped return immediately"""
