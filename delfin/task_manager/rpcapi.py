@@ -36,12 +36,16 @@ class TaskAPI(object):
 
     def __init__(self):
         super(TaskAPI, self).__init__()
-        target = messaging.Target(topic=CONF.delfin_task_topic,
-                                  version=self.RPC_API_VERSION)
-        self.client = rpc.get_client(target, version_cap=self.RPC_API_VERSION)
+        self.target = messaging.Target(topic='delfin-task',
+                                       version=self.RPC_API_VERSION)
+        self.client = rpc.get_client(self.target, version_cap=self.RPC_API_VERSION)
+
+    def set_target_topic(self, topic):
+        self.target = messaging.Target(topic=topic,
+                                       version=self.RPC_API_VERSION)
 
     def sync_storage_resource(self, context, storage_id, resource_task):
-        call_context = self.client.prepare(version='1.0')
+        call_context = self.client.prepare(topic='delfin-task', version='1.0')
         return call_context.cast(context,
                                  'sync_storage_resource',
                                  storage_id=storage_id,
@@ -70,6 +74,21 @@ class TaskAPI(object):
         return call_context.cast(context,
                                  'remove_storage_in_cache',
                                  storage_id=storage_id)
+
+    def addJob1(self, context, message, task_id):
+        print("Naju inside rpcapi")
+        print("target  is", self.target)
+        call_context = self.client.prepare(topic='delfin-task', version='1.0', fanout=True)
+        print("Naju client prepare done")
+        return call_context.cast(context, 'addJob1',
+                                 msg=message, task_id=task_id)
+
+    def addJob(self, context, message, task_id):
+        print("Naju inside rpcapi")
+        call_context = self.client.prepare(version='1.0', fanout=True)
+        print("Naju client prepare done")
+        return call_context.cast(context, 'addJob',
+                                 msg=message, task_id=task_id)
 
     def remove_telemetry_instances(self, context, storage_id, telemetry_task):
         call_context = self.client.prepare(version='1.0', fanout=True)

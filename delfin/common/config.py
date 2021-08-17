@@ -78,7 +78,7 @@ global_opts = [
                default='delfin.task_manager.manager.TaskManager',
                help='Full class name for the task manager.'),
     cfg.StrOpt('delfin_task_topic',
-               default='delfin-task',
+               default='naju_node',
                help='The topic task manager nodes listen on.'),
     cfg.StrOpt('delfin_alert_topic',
                default='delfin-alert',

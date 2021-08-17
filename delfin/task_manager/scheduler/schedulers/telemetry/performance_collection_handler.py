@@ -16,16 +16,16 @@ from datetime import datetime
 
 import six
 from oslo_log import log
+from oslo_utils import uuidutils
 
 from delfin import db
 from delfin import exception
 from delfin.common.constants import TelemetryCollection
 from delfin.db.sqlalchemy.models import FailedTask
+
 from delfin.task_manager import rpcapi as task_rpcapi
-from delfin.task_manager.scheduler.schedulers.telemetry. \
-    failed_performance_collection_handler import \
-    FailedPerformanceCollectionHandler
-from delfin.task_manager.tasks import telemetry
+from delfin.task_manager.scheduler import schedule_manager
+from delfin.task_manager.tasks.telemetry import PerformanceCollectionTask
 
 LOG = log.getLogger(__name__)
 
@@ -38,9 +38,12 @@ class PerformanceCollectionHandler(object):
         self.args = args
         self.interval = interval
         self.task_rpcapi = task_rpcapi.TaskAPI()
+        schedule_manager.SchedulerManager().start()
+        self.scheduler = schedule_manager.SchedulerManager().get_scheduler()
 
     @staticmethod
     def get_instance(ctx, task_id):
+        LOG.info('Naju Get PerformanceCollectionHandler instance')
         task = db.task_get(ctx, task_id)
         return PerformanceCollectionHandler(ctx, task_id, task['storage_id'],
                                             task['args'], task['interval'])
@@ -72,11 +75,14 @@ class PerformanceCollectionHandler(object):
             # Times are epoch time in milliseconds
             end_time = current_time * 1000
             start_time = end_time - (self.interval * 1000)
-            status = self.task_rpcapi. \
-                collect_telemetry(self.ctx, self.storage_id,
-                                  telemetry.TelemetryTask.__module__ + '.' +
-                                  'PerformanceCollectionTask', self.args,
-                                  start_time, end_time)
+            # status = self.task_rpcapi. \
+            #     collect_telemetry(self.ctx, self.storage_id,
+            #                       telemetry.TelemetryTask.__module__ + '.' +
+            #                       'PerformanceCollectionTask', self.args,
+            #                       start_time, end_time)
+
+            telemetry = PerformanceCollectionTask()
+            status = telemetry.collect(self.ctx,self.storage_id,self.args, start_time, end_time)
 
             db.task_update(self.ctx, self.task_id,
                            {'last_run_time': current_time})
@@ -93,15 +99,15 @@ class PerformanceCollectionHandler(object):
                       ",task id :{1} and interval(in sec):{2}"
                       .format(self.storage_id, self.task_id, self.interval))
 
-    def _handle_task_failure(self, start_time, end_time):
-        failed_task = {FailedTask.storage_id.name: self.storage_id,
-                       FailedTask.task_id.name: self.task_id,
-                       FailedTask.interval.name:
-                           TelemetryCollection.PERIODIC_JOB_INTERVAL,
-                       FailedTask.end_time.name: end_time,
-                       FailedTask.start_time.name: start_time,
-                       FailedTask.method.name:
-                           FailedPerformanceCollectionHandler.__module__ +
-                           '.' + FailedPerformanceCollectionHandler.__name__,
-                       FailedTask.retry_count.name: 0}
-        db.failed_task_create(self.ctx, failed_task)
+    # def _handle_task_failure(self, start_time, end_time):
+    #     failed_task = {FailedTask.storage_id.name: self.storage_id,
+    #                    FailedTask.task_id.name: self.task_id,
+    #                    FailedTask.interval.name:
+    #                        TelemetryCollection.PERIODIC_JOB_INTERVAL,
+    #                    FailedTask.end_time.name: end_time,
+    #                    FailedTask.start_time.name: start_time,
+    #                    FailedTask.method.name:
+    #                        FailedPerformanceCollectionHandler.__module__ +
+    #                        '.' + FailedPerformanceCollectionHandler.__name__,
+    #                    FailedTask.retry_count.name: 0}
+    #     db.failed_task_create(self.ctx, failed_task)

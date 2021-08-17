@@ -21,6 +21,9 @@ from oslo_utils import importutils
 
 from delfin import manager
 from delfin.drivers import manager as driver_manager
+from delfin.task_manager.scheduler.schedulers.telemetry.performance_collection_handler import \
+    PerformanceCollectionHandler
+from delfin.task_manager.scheduler.schedulers.telemetry.job_handler import JobHandler
 from delfin.task_manager.tasks import alerts, telemetry
 
 LOG = log.getLogger(__name__)
@@ -36,6 +39,7 @@ class TaskManager(manager.Manager):
         self.telemetry_task = telemetry.TelemetryTask()
         super(TaskManager, self).__init__(*args, **kwargs)
 
+
     def sync_storage_resource(self, context, storage_id, resource_task):
         LOG.debug("Received the sync_storage task: {0} request for storage"
                   " id:{1}".format(resource_task, storage_id))
@@ -45,8 +49,8 @@ class TaskManager(manager.Manager):
 
     def collect_telemetry(self, context, storage_id, telemetry_task,
                           args, start_time, end_time):
-        LOG.debug("Collecting resource metrics: {0} request for storage"
-                  " id:{1}".format(args, storage_id))
+        LOG.info("Collecting resource metrics: {0} request for storage"
+                 " id:{1}".format(args, storage_id))
         cls = importutils.import_class(telemetry_task)
         device_obj = cls()
         return device_obj.collect(context, storage_id, args, start_time,
@@ -62,6 +66,10 @@ class TaskManager(manager.Manager):
                  .format(storage_id))
         drivers = driver_manager.DriverManager()
         drivers.remove_driver(storage_id)
+
+
+
+
 
     def remove_telemetry_instances(self, context, storage_id, telemetry_task):
         LOG.info('Remove telemetry instances for storage id:{0}')
