@@ -1,0 +1,98 @@
+# Copyright 2020 The SODA Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+
+**periodical task manager**
+
+"""
+from oslo_log import log
+from oslo_utils import importutils
+
+from delfin import manager
+from delfin.drivers import manager as driver_manager
+from delfin.task_manager.distributor.telemetry.performance_collection_handler import PerformanceCollectionHandler
+from delfin.task_manager.tasks import alerts, telemetry
+
+LOG = log.getLogger(__name__)
+
+
+class TaskManager(manager.Manager):
+    """manage periodical tasks"""
+
+    RPC_API_VERSION = '1.0'
+
+    def __init__(self, service_name=None, *args, **kwargs):
+        self.alert_task = alerts.AlertSyncTask()
+        self.telemetry_task = telemetry.TelemetryTask()
+        super(TaskManager, self).__init__(*args, **kwargs)
+
+    def sync_storage_resource(self, context, storage_id, resource_task):
+        LOG.debug("Received the sync_storage task: {0} request for storage"
+                  " id:{1}".format(resource_task, storage_id))
+        cls = importutils.import_class(resource_task)
+        device_obj = cls(context, storage_id)
+        device_obj.sync()
+
+    def collect_telemetry(self, context, storage_id, telemetry_task,
+                          args, start_time, end_time):
+        LOG.info("Collecting resource metrics: {0} request for storage"
+                 " id:{1}".format(args, storage_id))
+        cls = importutils.import_class(telemetry_task)
+        device_obj = cls()
+        return device_obj.collect(context, storage_id, args, start_time,
+                                  end_time)
+
+    def remove_storage_resource(self, context, storage_id, resource_task):
+        cls = importutils.import_class(resource_task)
+        device_obj = cls(context, storage_id)
+        device_obj.remove()
+
+    def remove_storage_in_cache(self, context, storage_id):
+        LOG.info('Remove storage device in memory for storage id:{0}'
+                 .format(storage_id))
+        drivers = driver_manager.DriverManager()
+        drivers.remove_driver(storage_id)
+
+    def addJob1(self, context, msg, task_id):
+        LOG.info('Addd job message:{0}'
+                 .format(msg))
+        instance = PerformanceCollectionHandler.get_instance(context, task_id)
+
+        instance.addJob1()
+    def addJob(self, context, msg, task_id):
+        LOG.info('Addd job message:{0}'
+                 .format(msg))
+        instance = PerformanceCollectionHandler.get_instance(context, task_id)
+
+        instance.addJob()
+
+    def remove_telemetry_instances(self, context, storage_id, telemetry_task):
+        LOG.info('Remove telemetry instances for storage id:{0}')
+        cls = importutils.import_class(telemetry_task)
+        device_obj = cls()
+        return device_obj.remove_telemetry(context,
+                                           storage_id,
+                                           )
+
+    def sync_storage_alerts(self, context, storage_id, query_para):
+        LOG.info('Alert sync called for storage id:{0}'
+                 .format(storage_id))
+        self.alert_task.sync_alerts(context, storage_id, query_para)
+
+    def clear_storage_alerts(self, context, storage_id, sequence_number_list):
+        LOG.info('Clear alerts called for storage id: {0}'
+                 .format(storage_id))
+        return self.alert_task.clear_alerts(context,
+                                            storage_id,
+                                            sequence_number_list)

@@ -51,7 +51,7 @@ tasks to a wrapping service.
 This module provides Manager, a base class for managers.
 
 """
-
+from delfin.task_manager.scheduler.schedule_manager import SchedulerManager
 from oslo_config import cfg
 from oslo_log import log
 from oslo_service import periodic_task
@@ -81,9 +81,10 @@ class Manager(base.Base, PeriodicTasks):
 
         https://wiki.openstack.org/wiki/Oslo/Messaging#API_Version_Negotiation
         """
+        print('--------------------NAJU Getting target property.............')
         if not hasattr(self, '_target'):
             import oslo_messaging as messaging
-            self._target = messaging.Target(version=self.RPC_API_VERSION)
+            self._target = messaging.Target(topic= 'something', version=self.RPC_API_VERSION)
         return self._target
 
     def __init__(self, host=None, db_driver=None):
@@ -91,6 +92,10 @@ class Manager(base.Base, PeriodicTasks):
             host = CONF.host
         self.host = host
         self.additional_endpoints = []
+        #Naju
+        # schedule_mgr = SchedulerManager()
+        # schedule_mgr.start()
+
         super(Manager, self).__init__(db_driver)
 
     def periodic_tasks(self, context, raise_on_error=False):
@@ -103,6 +108,7 @@ class Manager(base.Base, PeriodicTasks):
         Child classes should override this method.
 
         """
+        print('.........Naju coming to init_host')
         pass
 
     def service_version(self, context):
