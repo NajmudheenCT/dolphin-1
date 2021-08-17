@@ -38,7 +38,7 @@ class PerformanceCollectionHandler(object):
         self.args = args
         self.interval = interval
         self.task_rpcapi = task_rpcapi.TaskAPI()
-        schedule_manager.SchedulerManager().start()
+        # schedule_manager.SchedulerManager().start()
         self.scheduler = schedule_manager.SchedulerManager().get_scheduler()
 
     @staticmethod

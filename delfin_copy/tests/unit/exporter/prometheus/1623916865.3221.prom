@@ -1,3 +1,0 @@
-# HELP storage_throughput  metric for resource storage and instance storage0
-# TYPE storage_throughput gauge
-storage_throughput{storage_id="12345",storage_name="None",storage_sn="None",resource_type="storage",resource_id="storage0",type="RAW",unit="MB/s",value_type="gauge"} 61.938890 1622827800000

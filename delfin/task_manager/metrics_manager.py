@@ -19,6 +19,7 @@
 from oslo_log import log
 
 from delfin import manager
+from delfin.task_manager.scheduler import schedule_manager
 
 from delfin.task_manager.scheduler.schedulers.telemetry.job_handler import JobHandler
 from delfin.task_manager.tasks import telemetry
@@ -34,6 +35,10 @@ class MetricsTaskManager(manager.Manager):
     def __init__(self, service_name=None, *args, **kwargs):
         self.telemetry_task = telemetry.TelemetryTask()
         super(MetricsTaskManager, self).__init__(*args, **kwargs)
+        scheduler = schedule_manager.SchedulerManager()
+        scheduler.boot_jobs_scheduled = True
+        if not scheduler.scheduler_started:
+            scheduler.start()
 
     def addJob1(self, context, msg, task_id):
         LOG.info('Addd job message:{0}'

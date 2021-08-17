@@ -58,6 +58,7 @@ class SchedulerManager(object):
         if not self.boot_jobs_scheduled:
             try:
                 for job in SCHEDULER_BOOT_JOBS:
+                    print('........Naju Scheduling Telemetry job distribution')
                     job_class = importutils.import_class(job)
                     job_instance = job_class(self.ctx)
 
