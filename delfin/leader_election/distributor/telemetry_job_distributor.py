@@ -91,9 +91,9 @@ class TelemetryJob(object):
                 # jobs book keeping
                 self.job_ids.add(job_id)
 
-                update_task_dict = {'job_id': job_id,
-                                    'last_run_time': last_run_time}
-                db.task_update(self.ctx, task_id, update_task_dict)
+                # update_task_dict = {'job_id': job_id,
+                #                     'last_run_time': last_run_time}
+                # db.task_update(self.ctx, task_id, update_task_dict)
                 LOG.debug('Periodic collection task triggered for for task id: '
                          '%s ' % task['id'])
         except Exception as e:
