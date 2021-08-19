@@ -22,8 +22,6 @@ from oslo_utils import uuidutils
 
 from delfin import context
 from delfin import utils
-from delfin.leader_election.distributor.failed_telemetry_job_distributor \
-    import FailedTelemetryJob
 from delfin.leader_election.distributor.telemetry_job_distributor \
     import TelemetryJob
 
@@ -59,7 +57,6 @@ class SchedulerManager(object):
         if not self.boot_jobs_scheduled:
             try:
                 for job in SCHEDULER_BOOT_JOBS:
-                    print('........Naju Scheduling Telemetry job distribution')
                     job_class = importutils.import_class(job)
                     job_instance = job_class(self.ctx)
 

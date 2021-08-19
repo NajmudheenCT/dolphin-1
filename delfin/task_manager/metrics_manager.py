@@ -38,10 +38,6 @@ class MetricsTaskManager(manager.Manager):
         scheduler = schedule_manager.SchedulerManager()
         scheduler.start()
 
-    def addJob1(self, context, msg, task_id):
-        LOG.info('Addd job message:{0}'
-                 .format(msg))
-        print('target in recieving side', self.target)
-        instance = JobHandler.get_instance(context, task_id)
-
-        instance.addJob1()
+    def distribute_job(self, context, job):
+        instance = JobHandler.get_instance(context, job['id'])
+        instance.distribute_job(job)

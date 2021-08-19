@@ -14,7 +14,7 @@
 
 from datetime import datetime
 
-import six
+from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import uuidutils
 
@@ -24,6 +24,7 @@ from delfin.task_manager.scheduler import schedule_manager
 from delfin.task_manager.scheduler.schedulers.telemetry.performance_collection_handler import \
     PerformanceCollectionHandler
 
+CONF = cfg.CONF
 LOG = log.getLogger(__name__)
 
 
@@ -35,8 +36,9 @@ class JobHandler(object):
         self.args = args
         self.interval = interval
         self.task_rpcapi = task_rpcapi.TaskAPI()
-        # schedule_manager.SchedulerManager().start()
         self.scheduler = schedule_manager.SchedulerManager().get_scheduler()
+        self.stopped = False
+        self.job_ids = set()
 
     @staticmethod
     def get_instance(ctx, task_id):
@@ -45,42 +47,49 @@ class JobHandler(object):
         return JobHandler(ctx, task_id, task['storage_id'],
                           task['args'], task['interval'])
 
-    def addJob1(self):
-        LOG.info(" NAju recieved add Job 1 new job handler")
+    def distribute_job(self, job):
+
+        if self.stopped:
+            """If Job is stopped return immediately"""
+            return
+
+        LOG.info("........... recieved A job  to schedule ")
         instance = PerformanceCollectionHandler.get_instance(self.ctx, self.task_id)
         current_time = int(datetime.now().timestamp())
         last_run_time = current_time
-        next_collection_time = last_run_time + 120
+        next_collection_time = last_run_time + job['interval']
         job_id = uuidutils.generate_uuid()
         next_collection_time = datetime \
             .fromtimestamp(next_collection_time) \
             .strftime('%Y-%m-%d %H:%M:%S')
         # is job already there for this task in scheduler
-        filters = {'id': self.task_id}
-        existing_task = db.task_get_all(self.ctx, filters=filters)
 
-        print('.....Naju Exisiting task ', existing_task[0]['id'])
-        existing_job_id = ''
+        existing_job_id = job['job_id']
 
-        if existing_task:
-            existing_job_id = existing_task[0]['job_id']
-            print('......Naju ', existing_job_id)
-            job = self.scheduler.get_job(existing_job_id)
-            print(job)
-        if not (existing_job_id and self.scheduler.get_job(existing_job_id)):
-            print('...........Naju scheduling new job')
+        scheduler_job = self.scheduler.get_job(existing_job_id)
+
+        if not (existing_job_id and scheduler_job):
+            print('...........Naju ..... scheduling new job')
             self.scheduler.add_job(
-                instance, 'interval', seconds=120,
+                instance, 'interval', seconds=job['interval'],
                 next_run_time=next_collection_time, id=job_id,
-                misfire_grace_time=60)
-        # jobs book keeping
-        # self.job_ids.add(job_id)
+                misfire_grace_time=int(
+                        CONF.telemetry.performance_collection_interval / 2))
 
-            job = self.scheduler.get_job(job_id)
-            print('....Naju .... new job id', job_id)
-            print('....Naju after creating job.........', job)
             update_task_dict = {'job_id': job_id,
                                 'last_run_time': last_run_time}
             db.task_update(self.ctx, self.task_id, update_task_dict)
             LOG.info('Periodic collection task triggered for for task id: '
                      '%s ' % self.task_id)
+
+    def stop(self):
+        self.stopped = True
+        for job_id in self.job_ids.copy():
+            self.remove_scheduled_job(job_id)
+        LOG.info("Stopping telemetry jobs")
+
+    def remove_scheduled_job(self, job_id):
+        if job_id in self.job_ids:
+            self.job_ids.remove(job_id)
+        if job_id and self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
