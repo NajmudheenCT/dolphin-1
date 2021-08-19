@@ -14,6 +14,7 @@
 
 from datetime import datetime
 
+import six
 from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import uuidutils
@@ -42,18 +43,17 @@ class JobHandler(object):
 
     @staticmethod
     def get_instance(ctx, task_id):
-        LOG.info('Naju Get PerformanceCollectionHandler instance')
         task = db.task_get(ctx, task_id)
         return JobHandler(ctx, task_id, task['storage_id'],
                           task['args'], task['interval'])
 
-    def distribute_job(self, job):
+    def schedule_job(self, job):
 
         if self.stopped:
             """If Job is stopped return immediately"""
             return
 
-        LOG.info("........... recieved A job  to schedule ")
+        LOG.info("........... JobHandler received A job %s to schedule.............. " % job['id'])
         instance = PerformanceCollectionHandler.get_instance(self.ctx, self.task_id)
         current_time = int(datetime.now().timestamp())
         last_run_time = current_time
@@ -69,7 +69,7 @@ class JobHandler(object):
         scheduler_job = self.scheduler.get_job(existing_job_id)
 
         if not (existing_job_id and scheduler_job):
-            print('...........Naju ..... scheduling new job')
+            LOG.info('.......... JobHandler scheduling a new job')
             self.scheduler.add_job(
                 instance, 'interval', seconds=job['interval'],
                 next_run_time=next_collection_time, id=job_id,
@@ -79,8 +79,10 @@ class JobHandler(object):
             update_task_dict = {'job_id': job_id,
                                 'last_run_time': last_run_time}
             db.task_update(self.ctx, self.task_id, update_task_dict)
-            LOG.info('Periodic collection task triggered for for task id: '
+            LOG.info('............Periodic collection task triggered for for job id: '
                      '%s ' % self.task_id)
+        else:
+            LOG.info('.......... Job already exists with this scheduler')
 
     def stop(self):
         self.stopped = True
@@ -93,3 +95,14 @@ class JobHandler(object):
             self.job_ids.remove(job_id)
         if job_id and self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
+
+    def remove_job(self, job):
+        try:
+            LOG.info("........received job %s to remove", job['id'])
+            job_id = job['job_id']
+            self.remove_scheduled_job(job_id)
+            db.task_delete(self.ctx, job['id'])
+            LOG.info("...........removed job %s ", job['id'])
+        except Exception as e:
+            LOG.error("Failed to remove periodic scheduling job , reason: %s.",
+                      six.text_type(e))

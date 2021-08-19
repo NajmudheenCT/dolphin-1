@@ -46,9 +46,16 @@ class TaskAPI(object):
                                   version=self.RPC_API_VERSION)
         return rpc.get_client(target, version_cap=self.RPC_API_VERSION)
 
-    def distribute_job(self, context, job):
+    def assign_job(self, context, job):
         executor = job['executor']
         rpc_client = self.get_client(str(executor))
         call_context = rpc_client.prepare(topic=str(executor), version='1.0', fanout=True)
-        return call_context.cast(context, 'distribute_job',
+        return call_context.cast(context, 'assign_job',
+                                 job=job)
+
+    def remove_job(self, context, job):
+        executor = job['executor']
+        rpc_client = self.get_client(str(executor))
+        call_context = rpc_client.prepare(topic=str(executor), version='1.0', fanout=True)
+        return call_context.cast(context, 'remove_job',
                                  job=job)

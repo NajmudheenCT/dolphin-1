@@ -40,7 +40,18 @@ class TelemetryJob(object):
     def __call__(self):
         """ Schedule the collection tasks based on interval """
 
-        # Todo check deleted storage and pass message to scheduler if any needs to be deleted
+        try:
+            # Remove jobs from scheduler when marked for delete
+            filters = {'deleted': True}
+            tasks = db.task_get_all(self.ctx, filters=filters)
+            LOG.debug("Total tasks found deleted "
+                      "in this cycle:%s" % len(tasks))
+            for task in tasks:
+                # Distribute to remove job form executor
+                self.task_rpcapi.remove_job(self.ctx, task)
+        except Exception as e:
+            LOG.error("Failed to remove periodic scheduling job , reason: %s.",
+                      six.text_type(e))
 
         try:
 
@@ -54,17 +65,17 @@ class TelemetryJob(object):
                 executor = job['id'] % TOTAL_NO_OF_TASK_EXECUTOR
                 db.task_update(self.ctx, job['id'], {'executor': executor})
                 job['executor'] = executor
-                LOG.info('Distributing periodic collection job for for task id: '
-                         '%s ' % job['id'])
-                self.task_rpcapi.distribute_job(self.ctx, job)
+                LOG.info('.............Distributing periodic collection job for for id: '
+                         '%s ..................' % job['id'])
+                self.task_rpcapi.assign_job(self.ctx, job)
 
-                LOG.debug('Periodic collection task distributed for for task id: '
-                         '%s ' % job['id'])
+                LOG.debug('Periodic collection task distributed for id: '
+                          '%s ' % job['id'])
         except Exception as e:
             LOG.error("Failed to distribute periodic collection, reason: %s.",
                       six.text_type(e))
         else:
-            LOG.debug("Periodic collection task distribution completed.")
+            LOG.debug("Periodic job distribution completed.")
 
     @classmethod
     def job_interval(cls):

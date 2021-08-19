@@ -38,6 +38,10 @@ class MetricsTaskManager(manager.Manager):
         scheduler = schedule_manager.SchedulerManager()
         scheduler.start()
 
-    def distribute_job(self, context, job):
+    def assign_job(self, context, job):
         instance = JobHandler.get_instance(context, job['id'])
-        instance.distribute_job(job)
+        instance.schedule_job(job)
+
+    def remove_job(self, context, job):
+        instance = JobHandler.get_instance(context, job['id'])
+        instance.remove_job(job)
