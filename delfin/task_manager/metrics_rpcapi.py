@@ -20,6 +20,7 @@ import oslo_messaging as messaging
 from oslo_config import cfg
 
 from delfin import rpc
+from delfin.common.constants import TELEMETRY_EXECUTOR_TOPIC
 
 CONF = cfg.CONF
 
@@ -36,19 +37,18 @@ class TaskAPI(object):
 
     def __init__(self):
         super(TaskAPI, self).__init__()
-        self.target = messaging.Target(topic='2',
+        self.target = messaging.Target(topic=TELEMETRY_EXECUTOR_TOPIC,
                                        version=self.RPC_API_VERSION)
         self.client = rpc.get_client(self.target, version_cap=self.RPC_API_VERSION)
 
     def get_client(self, topic):
         target = messaging.Target(topic=topic,
-                                       version=self.RPC_API_VERSION)
+                                  version=self.RPC_API_VERSION)
         return rpc.get_client(target, version_cap=self.RPC_API_VERSION)
-    def addJob1(self, context, message, task_id, storage_id):
-        print("Naju inside rpcapi")
-        print("target  is", self.target)
-        rpc_client = self.get_client(str(task_id))
-        call_context = rpc_client.prepare(topic=str(task_id), version='1.0', fanout=True)
-        print("Naju client prepare done")
-        return call_context.cast(context, 'addJob1',
-                                 msg=message, task_id=task_id)
+
+    def distribute_job(self, context, job):
+        executor = job['executor']
+        rpc_client = self.get_client(str(executor))
+        call_context = rpc_client.prepare(topic=str(executor), version='1.0', fanout=True)
+        return call_context.cast(context, 'distribute_job',
+                                 job=job)

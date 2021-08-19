@@ -117,20 +117,16 @@ class Service(service.Service):
 
         LOG.info('Starting %(topic)s node.', {'topic': self.topic})
         LOG.debug("Creating RPC server for service %s.", self.topic)
-        print('--------------Naju creating target .........................topic is ', self.topic)
 
         target = messaging.Target(topic=self.topic, server=self.host)
-        print('...................Naju target is ...........',target)
         endpoints = [self.manager]
         endpoints.extend(self.manager.additional_endpoints)
         self.rpcserver = rpc.get_server(target, endpoints)
-        print(('.............. Naju rpc server ', self.rpcserver))
         self.rpcserver.start()
 
         self.manager.init_host()
 
         if self.periodic_interval:
-            print('.........Naju Periodic interval set')
             if self.periodic_fuzzy_delay:
                 initial_delay = random.randint(0, self.periodic_fuzzy_delay)
             else:

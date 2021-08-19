@@ -44,22 +44,17 @@ class Elector(LeaderElector):
 
         self._coordinator = LeaderElectionCoordinator()
         self._coordinator.start()
-        LOG.info("Naju before ensure group")
 
         self._coordinator.ensure_group(self.election_key)
-        LOG.info("Naju before join group")
         self._coordinator.join_group()
-        LOG.info("Naju before on_started_leading")
 
         self._coordinator. \
             register_on_start_leading_callback(self.
                                                callbacks.on_started_leading)
 
-        LOG.info("Naju before setting callback")
         # Register internal callback to notify being a leader
         self._coordinator. \
             register_on_start_leading_callback(self.set_leader_callback)
-        LOG.info("Naju ater setting callback")
 
         while not self._stop.is_set():
             with timeutils.StopWatch() as w:

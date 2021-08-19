@@ -17,13 +17,9 @@ from datetime import datetime
 import six
 from oslo_config import cfg
 from oslo_log import log
-from oslo_utils import importutils
-from oslo_utils import uuidutils
 
 from delfin import db
-from delfin.common.constants import TelemetryCollection
-from delfin.task_manager.scheduler.schedulers.telemetry.performance_collection_handler import PerformanceCollectionHandler
-from delfin.task_manager.scheduler import schedule_manager
+from delfin.common.constants import TelemetryCollection, TOTAL_NO_OF_TASK_EXECUTOR
 from delfin.task_manager import metrics_rpcapi as task_rpcapi
 
 CONF = cfg.CONF
@@ -33,7 +29,6 @@ LOG = log.getLogger(__name__)
 class TelemetryJob(object):
     def __init__(self, ctx):
         self.ctx = ctx
-        self.scheduler = schedule_manager.SchedulerManager().get_scheduler()
         self.task_rpcapi = task_rpcapi.TaskAPI()
 
         # Reset last run time of tasks to restart scheduling and
@@ -42,78 +37,35 @@ class TelemetryJob(object):
         for task in task_list:
             db.task_update(ctx, task['id'], {'last_run_time': None})
 
-        self.stopped = False
-        self.job_ids = set()
-
     def __call__(self):
         """ Schedule the collection tasks based on interval """
-        print('............Naju Call back recieved for job distribution')
 
-        if self.stopped:
-            """If Job is stopped return immediately"""
-            return
+        # Todo check deleted storage and pass message to scheduler if any needs to be deleted
 
-        try:
-            # Remove jobs from scheduler when marked for delete
-            filters = {'deleted': True}
-            tasks = db.task_get_all(self.ctx, filters=filters)
-            LOG.debug("Total tasks found deleted "
-                      "in this cycle:%s" % len(tasks))
-            for task in tasks:
-                job_id = task['job_id']
-                if job_id and self.scheduler.get_job(job_id):
-                    self.remove_scheduled_job(job_id)
-                db.task_delete(self.ctx, task['id'])
-        except Exception as e:
-            LOG.error("Failed to remove periodic scheduling job , reason: %s.",
-                      six.text_type(e))
         try:
 
             filters = {'last_run_time': None}
-            tasks = db.task_get_all(self.ctx, filters=filters)
-            LOG.debug("Schedule performance collection triggered: total "
-                      "tasks to be handled:%s" % len(tasks))
-            for task in tasks:
-                # Get current time in epoch format in seconds. Here method
-                # indicates the specific collection task to be triggered
-                current_time = int(datetime.now().timestamp())
-                last_run_time = current_time
+            jobs = db.task_get_all(self.ctx, filters=filters)
+            LOG.debug("Distributing performance collection jobs: total "
+                      "jobs to be handled:%s" % len(jobs))
+            for job in jobs:
+                # Todo Get executor for the job
+                # update task table with executor topic
+                executor = job['id'] % TOTAL_NO_OF_TASK_EXECUTOR
+                db.task_update(self.ctx, job['id'], {'executor': executor})
+                job['executor'] = executor
+                LOG.info('Distributing periodic collection job for for task id: '
+                         '%s ' % job['id'])
+                self.task_rpcapi.distribute_job(self.ctx, job)
 
-                task_id = task['id']
-                job_id = uuidutils.generate_uuid()
-                storage_id = task['storage_id']
-
-                # convert to a  message
-                LOG.debug('Naju  Triggering addJob')
-                self.task_rpcapi.addJob1(self.ctx, 'message', task_id, storage_id)
-                LOG.debug("Naju Posted message")
-
-                # jobs book keeping
-                self.job_ids.add(job_id)
-
-                # update_task_dict = {'job_id': job_id,
-                #                     'last_run_time': last_run_time}
-                # db.task_update(self.ctx, task_id, update_task_dict)
-                LOG.debug('Periodic collection task triggered for for task id: '
-                         '%s ' % task['id'])
+                LOG.debug('Periodic collection task distributed for for task id: '
+                         '%s ' % job['id'])
         except Exception as e:
-            LOG.error("Failed to trigger periodic collection, reason: %s.",
+            LOG.error("Failed to distribute periodic collection, reason: %s.",
                       six.text_type(e))
         else:
-            LOG.debug("Periodic collection task Scheduling completed.")
-
-    def stop(self):
-        self.stopped = True
-        for job_id in self.job_ids.copy():
-            self.remove_scheduled_job(job_id)
-        LOG.info("Stopping telemetry jobs")
+            LOG.debug("Periodic collection task distribution completed.")
 
     @classmethod
     def job_interval(cls):
         return TelemetryCollection.PERIODIC_JOB_INTERVAL
-
-    def remove_scheduled_job(self, job_id):
-        if job_id in self.job_ids:
-            self.job_ids.remove(job_id)
-        if job_id and self.scheduler.get_job(job_id):
-            self.scheduler.remove_job(job_id)
