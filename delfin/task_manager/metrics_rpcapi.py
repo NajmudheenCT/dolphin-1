@@ -20,7 +20,6 @@ import oslo_messaging as messaging
 from oslo_config import cfg
 
 from delfin import rpc
-from delfin.common.constants import TELEMETRY_EXECUTOR_TOPIC
 
 CONF = cfg.CONF
 
@@ -37,7 +36,7 @@ class TaskAPI(object):
 
     def __init__(self):
         super(TaskAPI, self).__init__()
-        self.target = messaging.Target(topic=TELEMETRY_EXECUTOR_TOPIC,
+        self.target = messaging.Target(topic=CONF.host,
                                        version=self.RPC_API_VERSION)
         self.client = rpc.get_client(self.target, version_cap=self.RPC_API_VERSION)
 
@@ -58,4 +57,18 @@ class TaskAPI(object):
         rpc_client = self.get_client(str(executor))
         call_context = rpc_client.prepare(topic=str(executor), version='1.0', fanout=True)
         return call_context.cast(context, 'remove_job',
+                                 job=job)
+
+    def assign_failed_job(self, context, job):
+        executor = job['executor']
+        rpc_client = self.get_client(str(executor))
+        call_context = rpc_client.prepare(topic=str(executor), version='1.0', fanout=True)
+        return call_context.cast(context, 'assign_failed_job',
+                                 job=job)
+
+    def remove_failed_job(self, context, job):
+        executor = job['executor']
+        rpc_client = self.get_client(str(executor))
+        call_context = rpc_client.prepare(topic=str(executor), version='1.0', fanout=True)
+        return call_context.cast(context, 'remove_failed_job',
                                  job=job)

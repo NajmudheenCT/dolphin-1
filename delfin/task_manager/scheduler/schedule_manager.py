@@ -22,15 +22,15 @@ from oslo_utils import uuidutils
 
 from delfin import context
 from delfin import utils
+from delfin.leader_election.distributor.telemetry_failed_job_distributor import FailedTelemetryJob
 from delfin.leader_election.distributor.telemetry_job_distributor \
     import TelemetryJob
 
 LOG = log.getLogger(__name__)
 
 SCHEDULER_BOOT_JOBS = [
-    TelemetryJob.__module__ + '.' + TelemetryJob.__name__
-    # ,
-    # FailedTelemetryJob.__module__ + '.' + FailedTelemetryJob.__name__
+    TelemetryJob.__module__ + '.' + TelemetryJob.__name__,
+    FailedTelemetryJob.__module__ + '.' + FailedTelemetryJob.__name__
 ]
 
 

@@ -19,7 +19,7 @@ from oslo_config import cfg
 from oslo_log import log
 
 from delfin import db
-from delfin.common.constants import TelemetryCollection, TOTAL_NO_OF_TASK_EXECUTOR
+from delfin.common.constants import TelemetryCollection
 from delfin.task_manager import metrics_rpcapi as task_rpcapi
 
 CONF = cfg.CONF
@@ -61,8 +61,8 @@ class TelemetryJob(object):
                       "jobs to be handled:%s" % len(jobs))
             for job in jobs:
                 # Todo Get executor for the job
-                # update task table with executor topic
-                executor = job['id'] % TOTAL_NO_OF_TASK_EXECUTOR
+                # update task table with generated executor topic
+                executor = CONF.host
                 db.task_update(self.ctx, job['id'], {'executor': executor})
                 job['executor'] = executor
                 LOG.info('.............Distributing periodic collection job for for id: '

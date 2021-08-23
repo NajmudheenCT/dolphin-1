@@ -352,10 +352,6 @@ DELFIN_ARRAY_METRICS = [
 
 BLOCK_SIZE = 4096
 
-# Todo Delete this temp Telemetry executor topic
-TELEMETRY_EXECUTOR_TOPIC = '1'
-TOTAL_NO_OF_TASK_EXECUTOR = 2
-
 
 class ResourceSync(object):
     START = 100
@@ -369,7 +365,7 @@ class TelemetryCollection(object):
                               "telemetry.performance_collection_handler." \
                               "PerformanceCollectionHandler"
     """Performance monitoring job interval"""
-    PERIODIC_JOB_INTERVAL = 30
+    PERIODIC_JOB_INTERVAL = 180
     """Failed Performance monitoring job interval"""
     FAILED_JOB_SCHEDULE_INTERVAL = 240
     """Failed Performance monitoring retry count"""

@@ -22,6 +22,7 @@ from delfin import manager
 from delfin.task_manager.scheduler import schedule_manager
 
 from delfin.task_manager.scheduler.schedulers.telemetry.job_handler import JobHandler
+from delfin.task_manager.scheduler.schedulers.telemetry.job_handler import FailedJobHandler
 from delfin.task_manager.tasks import telemetry
 
 LOG = log.getLogger(__name__)
@@ -45,3 +46,11 @@ class MetricsTaskManager(manager.Manager):
     def remove_job(self, context, job):
         instance = JobHandler.get_instance(context, job['id'])
         instance.remove_job(job)
+
+    def assign_failed_job(self, context, job):
+        instance = FailedJobHandler.get_instance(context, job['id'])
+        instance.schedule_failed_job(job)
+
+    def remove_failed_job(self, context, job):
+        instance = FailedJobHandler.get_instance(context, job['id'])
+        instance.remove_failed_job(job)

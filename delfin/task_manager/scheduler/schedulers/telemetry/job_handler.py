@@ -17,9 +17,11 @@ from datetime import datetime
 import six
 from oslo_config import cfg
 from oslo_log import log
-from oslo_utils import uuidutils
+from oslo_utils import uuidutils, importutils
 
 from delfin import db
+from delfin.common.constants import TelemetryCollection, TelemetryJobStatus
+from delfin.exception import TaskNotFound
 from delfin.task_manager import rpcapi as task_rpcapi
 from delfin.task_manager.scheduler import schedule_manager
 from delfin.task_manager.scheduler.schedulers.telemetry.performance_collection_handler import \
@@ -74,7 +76,7 @@ class JobHandler(object):
                 instance, 'interval', seconds=job['interval'],
                 next_run_time=next_collection_time, id=job_id,
                 misfire_grace_time=int(
-                        CONF.telemetry.performance_collection_interval / 2))
+                    CONF.telemetry.performance_collection_interval / 2))
 
             update_task_dict = {'job_id': job_id,
                                 'last_run_time': last_run_time}
@@ -106,3 +108,106 @@ class JobHandler(object):
         except Exception as e:
             LOG.error("Failed to remove periodic scheduling job , reason: %s.",
                       six.text_type(e))
+
+
+class FailedJobHandler(object):
+    def __init__(self, ctx):
+        # create the object of periodic scheduler
+        self.scheduler = schedule_manager.SchedulerManager().get_scheduler()
+        self.ctx = ctx
+        self.stopped = False
+        self.job_ids = set()
+
+    @staticmethod
+    def get_instance(ctx, failed_task_id):
+        return FailedJobHandler(ctx)
+
+    def schedule_failed_job(self, job):
+        """
+        :return:
+        """
+
+        if self.stopped:
+            return
+
+        try:
+
+            retry_count = job['retry_count']
+            result = job['result']
+            job_id = job['job_id']
+            if retry_count >= \
+                    TelemetryCollection.MAX_FAILED_JOB_RETRY_COUNT or \
+                    result == TelemetryJobStatus.FAILED_JOB_STATUS_SUCCESS:
+                LOG.info("Exiting Failure task processing for task [%d] "
+                         "with result [%s] and retry count [%d] "
+                         % (job['id'], result, retry_count))
+                # task ID is same as job id
+                self._teardown_task(self.ctx, job['id'], job_id)
+                return
+            # If job already scheduled, skip
+            if job_id and self.scheduler.get_job(job_id):
+                return
+
+            try:
+                db.task_get(self.ctx, job['task_id'])
+            except TaskNotFound as e:
+                LOG.info("Removing failed telemetry job as parent job "
+                         "do not exist: %s", six.text_type(e))
+                # tear down if original task is not available
+                self._teardown_task(self.ctx, job['id'],
+                                    job_id)
+                return
+
+            if not (job_id and self.scheduler.get_job(job_id)):
+                job_id = uuidutils.generate_uuid()
+                db.failed_task_update(self.ctx, job['id'],
+                                      {'job_id': job_id})
+
+                collection_class = importutils.import_class(
+                    job['method'])
+                instance = \
+                    collection_class.get_instance(self.ctx, job['id'])
+                self.scheduler.add_job(
+                    instance, 'interval',
+                    seconds=job['interval'],
+                    next_run_time=datetime.now(), id=job_id,
+                    misfire_grace_time=int(
+                        CONF.telemetry.performance_collection_interval / 2)
+                )
+                self.job_ids.add(job_id)
+
+        except Exception as e:
+            LOG.error("Failed to schedule retry tasks for performance "
+                      "collection, reason: %s", six.text_type(e))
+        else:
+            LOG.info("Schedule collection completed")
+
+    def _teardown_task(self, ctx, failed_task_id, job_id):
+        db.failed_task_delete(ctx, failed_task_id)
+        self.remove_scheduled_job(job_id)
+
+    def remove_scheduled_job(self, job_id):
+        if job_id in self.job_ids:
+            self.job_ids.remove(job_id)
+        if job_id and self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+    def stop(self):
+        self.stopped = True
+        for job_id in self.job_ids.copy():
+            self.remove_scheduled_job(job_id)
+
+    def remove_failed_job(self, job):
+        try:
+            LOG.info("Received failed job %s to remove", job['id'])
+            job_id = job['job_id']
+            self.remove_scheduled_job(job_id)
+            db.failed_task_delete(self.ctx, job['id'])
+            LOG.info("Removed failed_task entry  %s ", job['id'])
+        except Exception as e:
+            LOG.error("Failed to remove periodic scheduling job , reason: %s.",
+                      six.text_type(e))
+
+    @classmethod
+    def job_interval(cls):
+        return TelemetryCollection.FAILED_JOB_SCHEDULE_INTERVAL

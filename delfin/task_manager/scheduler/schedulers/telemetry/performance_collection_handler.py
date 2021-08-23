@@ -15,6 +15,8 @@
 from datetime import datetime
 
 import six
+from delfin.task_manager.scheduler.schedulers.telemetry.failed_performance_collection_handler import \
+    FailedPerformanceCollectionHandler
 from oslo_log import log
 
 from delfin import db
@@ -29,20 +31,21 @@ LOG = log.getLogger(__name__)
 
 
 class PerformanceCollectionHandler(object):
-    def __init__(self, ctx, task_id, storage_id, args, interval):
+    def __init__(self, ctx, task_id, storage_id, args, interval, executor):
         self.ctx = ctx
         self.task_id = task_id
         self.storage_id = storage_id
         self.args = args
         self.interval = interval
         self.task_rpcapi = task_rpcapi.TaskAPI()
+        self.executor = executor
         self.scheduler = schedule_manager.SchedulerManager().get_scheduler()
 
     @staticmethod
     def get_instance(ctx, task_id):
         task = db.task_get(ctx, task_id)
         return PerformanceCollectionHandler(ctx, task_id, task['storage_id'],
-                                            task['args'], task['interval'])
+                                            task['args'], task['interval'], task['executor'])
 
     def __call__(self):
         # Upon periodic job callback, if storage is already deleted or soft
@@ -89,15 +92,16 @@ class PerformanceCollectionHandler(object):
                       ",task id :{1} and interval(in sec):{2}"
                       .format(self.storage_id, self.task_id, self.interval))
 
-    # def _handle_task_failure(self, start_time, end_time):
-    #     failed_task = {FailedTask.storage_id.name: self.storage_id,
-    #                    FailedTask.task_id.name: self.task_id,
-    #                    FailedTask.interval.name:
-    #                        TelemetryCollection.PERIODIC_JOB_INTERVAL,
-    #                    FailedTask.end_time.name: end_time,
-    #                    FailedTask.start_time.name: start_time,
-    #                    FailedTask.method.name:
-    #                        FailedPerformanceCollectionHandler.__module__ +
-    #                        '.' + FailedPerformanceCollectionHandler.__name__,
-    #                    FailedTask.retry_count.name: 0}
-    #     db.failed_task_create(self.ctx, failed_task)
+    def _handle_task_failure(self, start_time, end_time):
+        failed_task = {FailedTask.storage_id.name: self.storage_id,
+                       FailedTask.task_id.name: self.task_id,
+                       FailedTask.interval.name:
+                           TelemetryCollection.PERIODIC_JOB_INTERVAL,
+                       FailedTask.end_time.name: end_time,
+                       FailedTask.start_time.name: start_time,
+                       FailedTask.method.name:
+                           FailedPerformanceCollectionHandler.__module__ +
+                           '.' + FailedPerformanceCollectionHandler.__name__,
+                       FailedTask.retry_count.name: 0,
+                       FailedTask.executor.name: self.executor}
+        db.failed_task_create(self.ctx, failed_task)

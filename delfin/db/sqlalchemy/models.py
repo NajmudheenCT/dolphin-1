@@ -286,6 +286,7 @@ class FailedTask(BASE, DelfinBase):
     method = Column(String(255))
     result = Column(String(255))
     job_id = Column(String(36))
+    executor = Column(String(255))
     deleted_at = Column(DateTime)
     deleted = Column(Boolean, default=False)
 
