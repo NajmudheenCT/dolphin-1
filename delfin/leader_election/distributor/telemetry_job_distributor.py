@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime
 
 import six
 from oslo_config import cfg
@@ -65,11 +64,11 @@ class TelemetryJob(object):
                 executor = CONF.host
                 db.task_update(self.ctx, job['id'], {'executor': executor})
                 job['executor'] = executor
-                LOG.info('.............Distributing periodic collection job for for id: '
-                         '%s ..................' % job['id'])
+                LOG.info('Assigning executor for collection job for id: '
+                         '%s' % job['id'])
                 self.task_rpcapi.assign_job(self.ctx, job)
 
-                LOG.debug('Periodic collection task distributed for id: '
+                LOG.debug('Periodic collection job assigned for id: '
                           '%s ' % job['id'])
         except Exception as e:
             LOG.error("Failed to distribute periodic collection, reason: %s.",

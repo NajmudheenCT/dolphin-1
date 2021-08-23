@@ -80,7 +80,7 @@ class PerformanceCollectionHandler(object):
             db.task_update(self.ctx, self.task_id,
                            {'last_run_time': current_time})
 
-            if not status:
+            if  status:
                 raise exception.TelemetryTaskExecError()
         except Exception as e:
             LOG.error("Failed to collect performance metrics for "

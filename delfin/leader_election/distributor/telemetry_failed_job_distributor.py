@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime
 
 import six
 from oslo_config import cfg
 from oslo_log import log
-from oslo_utils import importutils
-from oslo_utils import uuidutils
 
 from delfin import db
-from delfin.common.constants import TelemetryJobStatus, TelemetryCollection
-from delfin.db.sqlalchemy.models import FailedTask
-from delfin.exception import TaskNotFound
+from delfin.common.constants import TelemetryCollection
 from delfin.task_manager import metrics_rpcapi as task_rpcapi
 
 CONF = cfg.CONF
@@ -40,7 +35,6 @@ class FailedTelemetryJob(object):
         """
         :return:
         """
-
 
         try:
             # Remove jobs from scheduler when marked for delete
@@ -61,8 +55,8 @@ class FailedTelemetryJob(object):
                 # Todo Get executor for the job
                 # update task table with executor topic
 
-                LOG.info('.............Assigning failed task for for id: '
-                         '%s ..................' % job['id'])
+                LOG.info('Assigning failed task for for id: '
+                         '%s' % job['id'])
                 self.task_rpcapi.assign_failed_job(self.ctx, job)
 
                 LOG.debug('Assigned failed task for  id: '

@@ -1,4 +1,4 @@
-# Copyright 2020 The SODA Authors.
+# Copyright 2021 The SODA Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Client side of the task manager RPC API.
+Client side of the metrics task manager RPC API.
 """
 
 import oslo_messaging as messaging
@@ -25,7 +25,7 @@ CONF = cfg.CONF
 
 
 class TaskAPI(object):
-    """Client side of the task rpc API.
+    """Client side of the metrics task rpc API.
 
     API version history:
 

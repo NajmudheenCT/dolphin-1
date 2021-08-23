@@ -55,7 +55,7 @@ class JobHandler(object):
             """If Job is stopped return immediately"""
             return
 
-        LOG.info("........... JobHandler received A job %s to schedule.............. " % job['id'])
+        LOG.info("JobHandler received A job %s to schedule" % job['id'])
         instance = PerformanceCollectionHandler.get_instance(self.ctx, self.task_id)
         current_time = int(datetime.now().timestamp())
         last_run_time = current_time
@@ -64,14 +64,13 @@ class JobHandler(object):
         next_collection_time = datetime \
             .fromtimestamp(next_collection_time) \
             .strftime('%Y-%m-%d %H:%M:%S')
-        # is job already there for this task in scheduler
 
         existing_job_id = job['job_id']
 
         scheduler_job = self.scheduler.get_job(existing_job_id)
 
         if not (existing_job_id and scheduler_job):
-            LOG.info('.......... JobHandler scheduling a new job')
+            LOG.info('JobHandler scheduling a new job')
             self.scheduler.add_job(
                 instance, 'interval', seconds=job['interval'],
                 next_run_time=next_collection_time, id=job_id,
@@ -81,10 +80,10 @@ class JobHandler(object):
             update_task_dict = {'job_id': job_id,
                                 'last_run_time': last_run_time}
             db.task_update(self.ctx, self.task_id, update_task_dict)
-            LOG.info('............Periodic collection task triggered for for job id: '
+            LOG.info('Periodic collection tasks scheduled for for job id: '
                      '%s ' % self.task_id)
         else:
-            LOG.info('.......... Job already exists with this scheduler')
+            LOG.info('Job already exists with this scheduler')
 
     def stop(self):
         self.stopped = True
@@ -100,11 +99,11 @@ class JobHandler(object):
 
     def remove_job(self, job):
         try:
-            LOG.info("........received job %s to remove", job['id'])
+            LOG.info("Received job %s to remove", job['id'])
             job_id = job['job_id']
             self.remove_scheduled_job(job_id)
             db.task_delete(self.ctx, job['id'])
-            LOG.info("...........removed job %s ", job['id'])
+            LOG.info("Removed job %s ", job['id'])
         except Exception as e:
             LOG.error("Failed to remove periodic scheduling job , reason: %s.",
                       six.text_type(e))
